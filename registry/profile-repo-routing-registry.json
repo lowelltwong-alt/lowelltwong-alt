@@ -1,0 +1,189 @@
+{
+  "schema_version": "0.2",
+  "registry_id": "lowelltwong_alt.profile_repo_router.v0_2",
+  "status": "profile_orientation_and_ai_routing_surface",
+  "observed_public_repositories_as_of": "2026-05-27",
+  "human_readme_policy": {
+    "purpose": "high-signal human landing page",
+    "keep_housekeeping_out_of_readme": true,
+    "ai_entrypoint_in_readme": "AI_FRONT_DOOR.md",
+    "do_not_overtly_target_employers_or_recruiters": true
+  },
+  "authority_boundary": {
+    "profile_repo_role": "human landing page and AI routing surface",
+    "repo_local_authority_wins": true,
+    "not_canonical_for_target_repo_internals": true,
+    "do_not_publish_private_repo_details_without_human_approval": true
+  },
+  "routing_surfaces": {
+    "human_landing_page": "README.md",
+    "ai_front_door": "AI_FRONT_DOOR.md",
+    "ai_portfolio_toc": "ai/AI_PORTFOLIO_TOC.md",
+    "build_philosophy": "ai/BUILD_PHILOSOPHY.md",
+    "public_repo_map": "PUBLIC_REPO_MAP.md",
+    "ai_update_instructions": "ai/AI_UPDATE_INSTRUCTIONS.md",
+    "agent_instructions": "AGENTS.md",
+    "machine_registry": "registry/profile-repo-routing-registry.json"
+  },
+  "portfolio_layers": [
+    {
+      "id": "lawfirm_os",
+      "label": "LawFirm OS",
+      "classification": "flagship",
+      "primary_repo": "LawFirm-os-semantic-substrate",
+      "primary_front_door": "LawFirm-os-semantic-substrate/registry/ai-front-door-registry.json",
+      "role": "Governed legal-AI operating architecture with separated control, execution, evidence, legal knowledge, and skills planes."
+    },
+    {
+      "id": "logos_ai",
+      "label": "Logos AI",
+      "classification": "primary_source_architecture",
+      "primary_repo": "logos-fractal-theological-architecture",
+      "primary_front_door": "logos-fractal-theological-architecture/README.md",
+      "role": "Theological and ultimate-frame source architecture for Logos-grounded governance and LAIRCA-style use."
+    },
+    {
+      "id": "noesis_style_routing",
+      "label": "Noesis-style profile routing",
+      "classification": "profile_level_router",
+      "primary_repo": "lowelltwong-alt",
+      "primary_front_door": "AI_FRONT_DOOR.md",
+      "role": "Portfolio-level intelligence router for public repos and AI entrypoints. No separate public Noesis repo assumed."
+    },
+    {
+      "id": "airca_lairca",
+      "label": "AIRCA / LAIRCA",
+      "classification": "supporting_decision_architecture_not_flagship",
+      "primary_repo": "airca-fractal-decision-architecture",
+      "primary_front_door": "airca-fractal-decision-architecture/README.md",
+      "role": "Supporting AI-era decision architecture and Logos-grounded Christian instantiation context."
+    }
+  ],
+  "public_repositories": [
+    {
+      "name": "lowelltwong-alt",
+      "url": "https://github.com/lowelltwong-alt/lowelltwong-alt",
+      "classification": "profile_router",
+      "family": "noesis_style_routing",
+      "role": "Human landing page and AI routing surface.",
+      "ai_start": [
+        "README.md",
+        "AI_FRONT_DOOR.md",
+        "ai/AI_PORTFOLIO_TOC.md",
+        "PUBLIC_REPO_MAP.md"
+      ]
+    },
+    {
+      "name": "LawFirm-os-semantic-substrate",
+      "url": "https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate",
+      "classification": "flagship",
+      "family": "lawfirm_os",
+      "plane": "control",
+      "role": "Canonical schemas, registries, governance, route/event authority, endpoint maps, and roadmap authority.",
+      "ai_start": [
+        "registry/ai-front-door-registry.json",
+        "AI_TABLE_OF_CONTENTS.md",
+        "governance/CROSS_REPO_MAP.md",
+        "ENDPOINTS_AND_COMMANDS.md"
+      ]
+    },
+    {
+      "name": "LawFirm-os-orchestrator",
+      "url": "https://github.com/lowelltwong-alt/LawFirm-os-orchestrator",
+      "classification": "active_public",
+      "family": "lawfirm_os",
+      "plane": "execution",
+      "role": "Contract-locked orchestration, autonomy classification, harness selection, and evidence packet generation.",
+      "ai_start": [
+        "README.md",
+        "AGENTS.md",
+        "AI_WORK_START_HERE.md"
+      ]
+    },
+    {
+      "name": "LawFirm-os-exceptions-lake-runtime",
+      "url": "https://github.com/lowelltwong-alt/LawFirm-os-exceptions-lake-runtime",
+      "classification": "active_public",
+      "family": "lawfirm_os",
+      "plane": "evidence",
+      "role": "Append-only runtime records, synthetic exception intake, validation outcomes, and audit evidence.",
+      "ai_start": [
+        "README.md",
+        "docs/RUNTIME_BOUNDARY.md",
+        "AI_WORK_START_HERE.md"
+      ]
+    },
+    {
+      "name": "LawFirm-os-legal-knowledge-runtime",
+      "url": "https://github.com/lowelltwong-alt/LawFirm-os-legal-knowledge-runtime",
+      "classification": "active_public",
+      "family": "lawfirm_os",
+      "plane": "legal_knowledge_runtime",
+      "role": "Synthetic legal ingestion preflight, retrieval planning, and Legal Context Bundle assembly.",
+      "ai_start": [
+        "README.md",
+        "LawFirm-os-semantic-substrate/registry/ai-front-door-registry.json"
+      ]
+    },
+    {
+      "name": "LawFirm-os-skills-registry",
+      "url": "https://github.com/lowelltwong-alt/LawFirm-os-skills-registry",
+      "classification": "active_public",
+      "family": "lawfirm_os",
+      "plane": "skills_trust",
+      "role": "Skill discovery, quarantine, scanning, grading, approval gates, and trust records.",
+      "ai_start": [
+        "AI_WORK_START_HERE.md",
+        "LawFirm-os-semantic-substrate/registry/ai-front-door-registry.json"
+      ]
+    },
+    {
+      "name": "logos-fractal-theological-architecture",
+      "url": "https://github.com/lowelltwong-alt/logos-fractal-theological-architecture",
+      "classification": "primary_source_architecture",
+      "family": "logos_ai",
+      "role": "Theological and ultimate-frame source architecture for Logos-grounded governance and LAIRCA-style use.",
+      "ai_start": [
+        "README.md",
+        "docs/governance/",
+        "docs/roadmap/"
+      ]
+    },
+    {
+      "name": "airca-fractal-decision-architecture",
+      "url": "https://github.com/lowelltwong-alt/airca-fractal-decision-architecture",
+      "classification": "supporting_public_draft_not_flagship",
+      "family": "airca_lairca",
+      "role": "Supporting AI-era decision architecture: AIRCA, UAIRCA, LAIRCA, fractal taxonomy, ontology, decision memory, and machine-readable artifacts. Not flagship.",
+      "ai_start": [
+        "README.md"
+      ]
+    },
+    {
+      "name": "lairca-logos-grounded-theological-model",
+      "url": "https://github.com/lowelltwong-alt/lairca-logos-grounded-theological-model",
+      "classification": "archive_legacy",
+      "family": "logos_ai",
+      "role": "Archived LAIRCA Logos-grounded theological model and attribution/license surface.",
+      "ai_start": [
+        "README.md",
+        "logos-fractal-theological-architecture/README.md"
+      ]
+    }
+  ],
+  "update_rules": {
+    "keep_readme_human_clean": true,
+    "housekeeping_file": "ai/AI_UPDATE_INSTRUCTIONS.md",
+    "agent_file": "AGENTS.md",
+    "airca_not_flagship": true,
+    "lawfirm_os_authority_route": "LawFirm-os-semantic-substrate",
+    "logos_authority_route": "logos-fractal-theological-architecture",
+    "noesis_status": "profile_level_router_unless_public_repo_is_created"
+  },
+  "claim_discipline": {
+    "confirmed": "directly supported by current repo files or public repo metadata",
+    "inferred": "logically derived but not directly stated",
+    "assumed": "working assumption",
+    "unknown": "not available from current public evidence"
+  }
+}
