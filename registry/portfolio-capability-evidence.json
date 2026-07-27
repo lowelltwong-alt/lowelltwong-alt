@@ -1,0 +1,159 @@
+{
+  "registry_id": "lowelltwong_alt.portfolio_capability_evidence.v1",
+  "schema_version": "1.0",
+  "status": "profile_orientation_metadata",
+  "generated": "2026-07-27",
+  "authority_boundary": {
+    "profile_repo_role": "noncanonical portfolio interpretation surface",
+    "repo_local_authority_wins": true,
+    "not_canonical_for_target_repo_internals": true
+  },
+  "claim_policy": {
+    "rule": "a capability is listed as implemented only when public repository evidence supports it",
+    "status_vocabulary": [
+      "implemented",
+      "prototype",
+      "draft_contract",
+      "experimental",
+      "planned",
+      "not_built"
+    ],
+    "validation_vocabulary": [
+      "tested",
+      "partially_tested",
+      "not_tested"
+    ],
+    "data_vocabulary": [
+      "synthetic_only",
+      "production_validated"
+    ],
+    "no_estimated_value_as_measured_value": true
+  },
+  "portfolio_identity": "governed_agentic_systems_and_enterprise_workflow_transformation",
+  "reference_domain": "legal_operations_insurance_defense",
+  "capabilities": [
+    {
+      "capability": "control_plane_separation_of_meaning_and_authority",
+      "status": "implemented",
+      "validation": "tested",
+      "data": "synthetic_only",
+      "public_evidence": [
+        "LawFirm-os-semantic-substrate"
+      ]
+    },
+    {
+      "capability": "contract_locked_execution_with_human_gates",
+      "status": "implemented",
+      "validation": "tested",
+      "data": "synthetic_only",
+      "public_evidence": [
+        "LawFirm-os-orchestrator"
+      ]
+    },
+    {
+      "capability": "append_only_runtime_evidence_and_exception_records",
+      "status": "implemented",
+      "validation": "tested",
+      "data": "synthetic_only",
+      "public_evidence": [
+        "LawFirm-os-exceptions-lake-runtime"
+      ],
+      "note": "the EvidencePacket v2 admission and quarantine pipeline is experimental and pre-governance; it is not the supported surface"
+    },
+    {
+      "capability": "governed_retrieval_and_domain_context_assembly",
+      "status": "implemented",
+      "validation": "tested",
+      "data": "synthetic_only",
+      "public_evidence": [
+        "LawFirm-os-legal-knowledge-runtime"
+      ]
+    },
+    {
+      "capability": "agent_capability_supply_chain_with_review_and_approval_gates",
+      "status": "implemented",
+      "validation": "tested",
+      "data": "synthetic_only",
+      "public_evidence": [
+        "LawFirm-os-skills-registry"
+      ]
+    },
+    {
+      "capability": "synthetic_operational_environment_for_workflow_simulation",
+      "status": "prototype",
+      "validation": "partially_tested",
+      "data": "synthetic_only",
+      "public_evidence": [
+        "law-firm-digital-twin"
+      ]
+    },
+    {
+      "capability": "candidate_to_canonical_promotion_control",
+      "status": "implemented",
+      "validation": "tested",
+      "data": "synthetic_only",
+      "public_evidence": [
+        "LawFirm-os-semantic-substrate/schemas/promotion-decision.schema.json"
+      ]
+    },
+    {
+      "capability": "end_to_end_intake_to_budget_workflow_run",
+      "status": "implemented",
+      "validation": "tested",
+      "data": "synthetic_only",
+      "public_evidence": [
+        "LawFirm-os-intake"
+      ],
+      "note": "one command produces a matter-opening package and a driver-scaled UTBMS budget proposal from a messy synthetic intake; terminates at blocked_pending_conflicts_and_engagement"
+    },
+    {
+      "capability": "comparative_evaluation_across_deterministic_retrieval_and_agent_conditions",
+      "status": "not_built",
+      "validation": "not_tested",
+      "data": "synthetic_only",
+      "public_evidence": []
+    },
+    {
+      "capability": "exception_to_improvement_loop_with_regression_control",
+      "status": "planned",
+      "validation": "not_tested",
+      "data": "synthetic_only",
+      "public_evidence": [],
+      "note": "component contracts exist publicly; the complete cycle has not been demonstrated"
+    },
+    {
+      "capability": "adoption_and_value_measurement_across_an_initiative_portfolio",
+      "status": "not_built",
+      "validation": "not_tested",
+      "data": "synthetic_only",
+      "public_evidence": []
+    },
+    {
+      "capability": "bounded_model_adaptation_experiment_with_held_out_evaluation",
+      "status": "not_built",
+      "validation": "not_tested",
+      "data": "synthetic_only",
+      "public_evidence": [
+        "LawFirm-os-semantic-substrate/schemas/adaptation-proposal.schema.json"
+      ],
+      "note": "the proposal contract exists; no experiment has been run"
+    },
+    {
+      "capability": "policy_constrained_cost_forecast_with_unmodified_proposal",
+      "status": "implemented",
+      "validation": "tested",
+      "data": "synthetic_only",
+      "public_evidence": [
+        "LawFirm-os-intake"
+      ],
+      "note": "carrier-compliant projection applies synthetic guideline caps without rewriting the proposal"
+    }
+  ],
+  "non_claims": [
+    "no production deployment",
+    "no real client, matter, employee, carrier, or firm-confidential data",
+    "no measured business value",
+    "no benchmark result on held-out data",
+    "not legal advice and not an autonomous decision-maker"
+  ]
+}

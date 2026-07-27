@@ -23,8 +23,19 @@ Use this file to determine:
 3. ai/AI_PORTFOLIO_TOC.md
 4. PUBLIC_REPO_MAP.md
 5. registry/profile-repo-routing-registry.json
-6. target repo README / AI front door / governance docs
+6. PORTABILITY_MAP.md
+7. target repo README / AI front door / governance docs
 ```
+
+To answer "what does this portfolio demonstrate, and does it transfer outside legal?", read
+`PORTABILITY_MAP.md` and `registry/portfolio-capability-evidence.json`. The capability registry
+states what is implemented, what is planned, and what is **not built** — do not infer capability
+from architecture documents alone.
+
+For a runnable demonstration rather than a contract, start at
+[`LawFirm-os-intake`](https://github.com/lowelltwong-alt/LawFirm-os-intake): one command turns a
+messy synthetic intake package into a human-reviewable matter-opening package and a driver-scaled
+budget proposal.
 
 For maintenance or future updates, continue to:
 
@@ -46,7 +57,10 @@ This profile repo is a **router**, not the canonical source for every project.
 | `ai/AI_PORTFOLIO_TOC.md` | AI-readable explanation of repo families and what makes them distinct. |
 | `ai/BUILD_PHILOSOPHY.md` | How to understand the architecture style and design grammar. |
 | `PUBLIC_REPO_MAP.md` | Public repository inventory. |
+| `PORTABILITY_MAP.md` | How the legal reference domain maps to a general enterprise problem class, and what is not demonstrated yet. |
 | `registry/profile-repo-routing-registry.json` | Machine-readable route map. |
+| `registry/portable-workflow-patterns.json` | Machine-readable legal-to-enterprise pattern mapping. |
+| `registry/portfolio-capability-evidence.json` | Machine-readable capability status with implemented / planned / not-built labels. |
 | Target repo files | Canonical authority for that target repo. |
 
 Do not treat profile-level descriptions as canon when a target repo has a more specific README, registry, governance doc, schema, or AI front door.
@@ -101,6 +115,7 @@ LawFirm OS repo roles:
 | Evidence | `LawFirm-os-exceptions-lake-runtime` | Append-only runtime records and audit evidence. |
 | Legal knowledge | `LawFirm-os-legal-knowledge-runtime` | Synthetic legal ingestion, retrieval planning, Legal Context Bundle assembly. |
 | Skills / trust | `LawFirm-os-skills-registry` | Skill discovery, quarantine, scanning, grading, approval gates, and trust records. |
+| Vertical composition | `LawFirm-os-intake` | Runnable intake-to-budget workflow: composes and evaluates the vertical, owns no platform canon. **Start here for a working demonstration.** |
 
 ---
 
