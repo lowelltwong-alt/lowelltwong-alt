@@ -25,7 +25,7 @@ This note does **not**:
 
 - redefine any target repo's canon (LawFirm OS, Logos, Noesis, AIRCA, etc.);
 - promote AIRCA to flagship status — LawFirm OS remains the flagship per the existing portfolio framing;
-- publish private/concept repo names (`obsidian-foundry-vault`, `lowell-career-os`, `kirsten-dissertation-knowledge-graph`, `Ryans-Project`, `Mock-Trial-4.26`, `fmg-fractal-capability-ontology`, `exceptions-lake-runtime` mirrors, `logos-governed-core`, etc.);
+- publish private or concept repository names, private mirrors, or any other non-public repo detail;
 - bind Logos to be the LawFirm OS legal-runtime authority — that crosswalk is governed by repo-local documents;
 - declare Noesis, Logos, AIRCA, or LawFirm OS to share one permission model;
 - introduce required runtime metrics; any quantitative claim below is conceptual.

@@ -2,7 +2,7 @@
   "schema_version": "0.2",
   "registry_id": "lowelltwong_alt.profile_repo_router.v0_2",
   "status": "profile_orientation_and_ai_routing_surface",
-  "observed_public_repositories_as_of": "2026-05-27",
+  "observed_public_repositories_as_of": "2026-07-27",
   "human_readme_policy": {
     "purpose": "high-signal human landing page",
     "keep_housekeeping_out_of_readme": true,
@@ -23,7 +23,10 @@
     "public_repo_map": "PUBLIC_REPO_MAP.md",
     "ai_update_instructions": "ai/AI_UPDATE_INSTRUCTIONS.md",
     "agent_instructions": "AGENTS.md",
-    "machine_registry": "registry/profile-repo-routing-registry.json"
+    "machine_registry": "registry/profile-repo-routing-registry.json",
+    "portability_map": "PORTABILITY_MAP.md",
+    "portable_workflow_patterns": "registry/portable-workflow-patterns.json",
+    "portfolio_capability_evidence": "registry/portfolio-capability-evidence.json"
   },
   "portfolio_layers": [
     {
@@ -135,6 +138,20 @@
       "ai_start": [
         "AI_WORK_START_HERE.md",
         "LawFirm-os-semantic-substrate/registry/ai-front-door-registry.json"
+      ]
+    },
+    {
+      "name": "LawFirm-os-intake",
+      "url": "https://github.com/lowelltwong-alt/LawFirm-os-intake",
+      "classification": "active_public",
+      "family": "lawfirm_os",
+      "plane": "vertical_workflow_composition",
+      "role": "Runnable intake-to-budget vertical: messy synthetic intake to a human-reviewable matter-opening package and driver-scaled UTBMS budget proposal. Composes and evaluates; owns no platform canon.",
+      "ai_start": [
+        "README.md",
+        "GOVERNANCE_BOUNDARY.md",
+        "docs/decisions/",
+        "VISIBILITY_AND_RELEASE.md"
       ]
     },
     {

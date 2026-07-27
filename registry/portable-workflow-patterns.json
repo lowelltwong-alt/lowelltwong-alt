@@ -1,0 +1,134 @@
+{
+  "registry_id": "lowelltwong_alt.portable_workflow_patterns.v1",
+  "schema_version": "1.0",
+  "status": "profile_orientation_metadata",
+  "authority_boundary": {
+    "profile_repo_role": "noncanonical portfolio interpretation surface",
+    "not_canonical_for_target_repo_internals": true,
+    "canonical_contract_authority": "LawFirm-os-semantic-substrate",
+    "note": "This registry describes how the reference domain maps to a general problem class. It does not define, rename, or promote any canonical contract."
+  },
+  "reference_domain": "legal_operations_insurance_defense",
+  "problem_class": {
+    "label": "document_intensive_policy_constrained_multistage_expert_reviewed_workflow",
+    "properties": [
+      "document_intensive",
+      "policy_constrained",
+      "multistage",
+      "exception_driven",
+      "human_reviewed",
+      "evidence_sensitive",
+      "audit_sensitive",
+      "cost_and_latency_constrained"
+    ],
+    "other_domains_with_same_properties": [
+      "claims_adjudication",
+      "regulatory_submission_review",
+      "contract_and_procurement_review",
+      "underwriting",
+      "clinical_documentation_review",
+      "incident_and_safety_review",
+      "benefits_or_grant_determination",
+      "audit_response"
+    ]
+  },
+  "patterns": [
+    {
+      "legal": "matter_intake",
+      "portable": "case_claim_incident_request_order_or_application_intake",
+      "public_evidence": "LawFirm-os-intake",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "complaint_and_claim_file",
+      "portable": "multi_document_evidence_package",
+      "public_evidence": "LawFirm-os-semantic-substrate/schemas/evidence-packet.schema.json",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "carrier_guidelines",
+      "portable": "policy_contract_control_sla_or_operating_rule",
+      "public_evidence": "LawFirm-os-intake",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "matter_plan",
+      "portable": "work_response_remediation_or_service_plan",
+      "public_evidence": "LawFirm-os-semantic-substrate/schemas/workflow-composition.schema.json",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "litigation_budget",
+      "portable": "cost_forecast_resource_plan_or_operational_estimate",
+      "public_evidence": "LawFirm-os-semantic-substrate/schemas/view-budget-workbook.schema.json",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "attorney_approval",
+      "portable": "accountable_domain_expert_approval",
+      "public_evidence": "LawFirm-os-semantic-substrate/schemas/human-approval-record.schema.json",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "carrier_rejection",
+      "portable": "customer_regulator_payer_auditor_or_system_rejection",
+      "public_evidence": "LawFirm-os-intake",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "budget_versus_actual",
+      "portable": "forecast_versus_outcome_measurement",
+      "public_evidence": "LawFirm-os-intake",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "exceptions_lake",
+      "portable": "quality_incident_correction_and_learning_evidence_system",
+      "public_evidence": "LawFirm-os-exceptions-lake-runtime",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "defect_classification",
+      "portable": "failure_taxonomy_for_diagnosis_and_regression_control",
+      "public_evidence": "LawFirm-os-semantic-substrate/schemas/defect-record.schema.json",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "legal_context_bundle",
+      "portable": "governed_domain_context_package",
+      "public_evidence": "LawFirm-os-semantic-substrate/schemas/legal-context-bundle.schema.json",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "skills_registry",
+      "portable": "enterprise_agent_capability_supply_chain",
+      "public_evidence": "LawFirm-os-skills-registry",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "law_firm_digital_twin",
+      "portable": "synthetic_operational_environment",
+      "public_evidence": "law-firm-digital-twin",
+      "evidence_status": "prototype_synthetic"
+    },
+    {
+      "legal": "candidate_to_canonical_promotion",
+      "portable": "governed_change_control_for_shared_meaning",
+      "public_evidence": "LawFirm-os-semantic-substrate/schemas/promotion-decision.schema.json",
+      "evidence_status": "implemented_synthetic"
+    },
+    {
+      "legal": "model_adaptation_proposal",
+      "portable": "post_training_or_adaptation_decision_record",
+      "public_evidence": "LawFirm-os-semantic-substrate/schemas/adaptation-proposal.schema.json",
+      "evidence_status": "draft_contract_no_experiment_run"
+    }
+  ],
+  "non_claims": [
+    "does not claim production deployment",
+    "does not claim real-data validation",
+    "does not claim measured business value",
+    "does not claim model superiority over any baseline",
+    "does not create canonical identifiers for any LawFirm OS repository"
+  ]
+}
