@@ -1,55 +1,25 @@
-# Public Repo Map
+# Public Repository Map
 
-This file is the public repository inventory and routing map for `lowelltwong-alt`.
+Canonical registry projection, observed from the anonymous GitHub API on 2026-08-27: **17 public repositories**. Detailed claim proof lives in `registry/profile-repo-routing-registry.json`; each target repository's README, TOC, source, and validation artifacts remain authoritative.
 
-It is more detailed than the profile README and less operational than the AI update instructions.
-
----
-
-## Classification
-
-| Classification | Meaning |
-|---|---|
-| **Flagship** | Primary public architecture surface. |
-| **Primary source architecture** | Major source/governance architecture, not necessarily the legal-AI flagship. |
-| **Profile router** | Human landing page and AI routing layer. |
-| **Supporting public draft** | Public but supporting, exploratory, or context-providing architecture. |
-| **Archive / legacy** | Historical or attribution context. |
-
----
-
-## Repositories
-
-| Repo | Classification | Family | Role | AI start |
+| Repository | Delivery | Maturity | Priority | Route |
 |---|---|---|---|---|
-| [`lowelltwong-alt`](https://github.com/lowelltwong-alt/lowelltwong-alt) | Profile router | Noesis-style routing | Human landing page and AI routing surface for the public portfolio. | `README.md`, `AI_FRONT_DOOR.md`, `ai/AI_PORTFOLIO_TOC.md` |
-| [`LawFirm-os-semantic-substrate`](https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate) | Flagship | LawFirm OS | Control plane for canonical schemas, registries, governance, route/event authority, endpoint maps, and roadmap authority. | `registry/ai-front-door-registry.json`, `AI_TABLE_OF_CONTENTS.md`, `governance/CROSS_REPO_MAP.md` |
-| [`LawFirm-os-orchestrator`](https://github.com/lowelltwong-alt/LawFirm-os-orchestrator) | Active public | LawFirm OS | Execution plane for contract-locked orchestration, autonomy classification, harness selection, and evidence packet generation. | `README.md`, `AGENTS.md`, `AI_WORK_START_HERE.md` |
-| [`LawFirm-os-exceptions-lake-runtime`](https://github.com/lowelltwong-alt/LawFirm-os-exceptions-lake-runtime) | Active public | LawFirm OS | Evidence plane for append-only runtime records, synthetic exception intake, validation outcomes, and audit records. | `README.md`, `docs/RUNTIME_BOUNDARY.md`, `AI_WORK_START_HERE.md` |
-| [`LawFirm-os-legal-knowledge-runtime`](https://github.com/lowelltwong-alt/LawFirm-os-legal-knowledge-runtime) | Active public | LawFirm OS | Legal knowledge runtime for synthetic legal ingestion preflight, retrieval planning, and Legal Context Bundle assembly. | `README.md`, then substrate AI front door |
-| [`LawFirm-os-skills-registry`](https://github.com/lowelltwong-alt/LawFirm-os-skills-registry) | Active public | LawFirm OS | Skills/trust plane for discovery, quarantine, scanning, grading, approval gates, and skill trust records. | `AI_WORK_START_HERE.md`, then substrate AI front door |
-| [`LawFirm-os-intake`](https://github.com/lowelltwong-alt/LawFirm-os-intake) | Active public | LawFirm OS | Vertical workflow composition: a runnable intake-to-budget reference that turns messy synthetic intake into a human-reviewable matter-opening package and a driver-scaled UTBMS budget proposal. Composes and evaluates; owns no platform canon. **The place to start for a working demonstration rather than a contract.** | `README.md` ("Evaluate this repo in 10 minutes"), `GOVERNANCE_BOUNDARY.md`, `docs/decisions/` |
-| [`logos-fractal-theological-architecture`](https://github.com/lowelltwong-alt/logos-fractal-theological-architecture) | Primary source architecture | Logos AI | Theological and ultimate-frame source architecture for Logos-grounded governance and LAIRCA-style use. | `README.md`, `docs/governance/`, `docs/roadmap/` |
-| [`airca-fractal-decision-architecture`](https://github.com/lowelltwong-alt/airca-fractal-decision-architecture) | Supporting public draft | AIRCA / LAIRCA | Supporting decision architecture: AIRCA, UAIRCA, LAIRCA, fractal taxonomy, ontology, decision memory, and machine-readable artifacts. Not flagship. | `README.md` |
-| [`lairca-logos-grounded-theological-model`](https://github.com/lowelltwong-alt/lairca-logos-grounded-theological-model) | Archive / legacy | Logos / LAIRCA | Archived LAIRCA theological model and attribution/license surface. Prefer active Logos repo for current architecture. | `README.md`, then Logos repo |
+| [`airca-fractal-decision-architecture`](https://github.com/lowelltwong-alt/airca-fractal-decision-architecture) | `prototype` | `draft` | `supporting` | Supporting decision architecture; not flagship. |
+| [`claude-legal-audit-lab`](https://github.com/lowelltwong-alt/claude-legal-audit-lab) | `prototype` | `candidate_only` | `deprioritized` | Public audit-harness prototype; maturity remains candidate-only. |
+| [`lairca-logos-grounded-theological-model`](https://github.com/lowelltwong-alt/lairca-logos-grounded-theological-model) | `archive` | `archived` | `archive` | Historical attribution context. |
+| [`law-firm-digital-twin`](https://github.com/lowelltwong-alt/law-firm-digital-twin) | `prototype` | `candidate_only` | `supporting` | Synthetic simulation candidate. |
+| [`LawFirm-os-exceptions-lake-runtime`](https://github.com/lowelltwong-alt/LawFirm-os-exceptions-lake-runtime) | `implementation` | `public_mvp` | `supporting` | Evidence-plane public MVP. |
+| [`LawFirm-os-intake`](https://github.com/lowelltwong-alt/LawFirm-os-intake) | `implementation` | `public_reference` | `featured` | Synthetic, human-reviewable reference workflow. |
+| [`LawFirm-os-legal-knowledge-runtime`](https://github.com/lowelltwong-alt/LawFirm-os-legal-knowledge-runtime) | `implementation` | `public_mvp` | `supporting` | Local-first, synthetic-first context assembly MVP. |
+| [`LawFirm-os-orchestrator`](https://github.com/lowelltwong-alt/LawFirm-os-orchestrator) | `implementation` | `public_mvp` | `featured` | Contract-governed execution plane. |
+| [`LawFirm-os-semantic-substrate`](https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate) | `public_proof` | `public_contract` | `featured` | LawFirm OS contract authority. |
+| [`LawFirm-os-skills-registry`](https://github.com/lowelltwong-alt/LawFirm-os-skills-registry) | `implementation` | `public_mvp` | `featured` | Local-first skill supply-chain controls. |
+| [`logos-boundary-literature`](https://github.com/lowelltwong-alt/logos-boundary-literature) | `scaffold` | `scaffold_only` | `supporting` | Source-separation scaffold with no source texts. |
+| [`logos-doctrine-genealogy`](https://github.com/lowelltwong-alt/logos-doctrine-genealogy) | `scaffold` | `scaffold_only` | `supporting` | Data-free doctrine-lineage scaffold. |
+| [`logos-governance-architecture`](https://github.com/lowelltwong-alt/logos-governance-architecture) | `public_proof` | `public_architecture` | `featured` | Bounded theological governance route. |
+| [`logos-scripture-graph`](https://github.com/lowelltwong-alt/logos-scripture-graph) | `implementation` | `public_substrate` | `featured` | Deterministic Scripture graph substrate. |
+| [`lowelltwong-alt`](https://github.com/lowelltwong-alt/lowelltwong-alt) | `public_proof` | `profile_router` | `featured` | Human profile and AI routing surface. |
+| [`noesis-atlas`](https://github.com/lowelltwong-alt/noesis-atlas) | `prototype` | `skeletal` | `supporting` | Skeletal controlled-use taxonomy control plane. |
+| [`orphan-radar`](https://github.com/lowelltwong-alt/orphan-radar) | `public_proof` | `public_implementation` | `featured` | Local-first graph maintenance with bounded classical candidate ranking. |
 
----
-
-## Route rules
-
-| Question | Route |
-|---|---|
-| What is the flagship? | LawFirm OS, anchored by `LawFirm-os-semantic-substrate`. |
-| Is AIRCA flagship? | No. AIRCA is supporting decision architecture. |
-| Where should AI start? | `AI_FRONT_DOOR.md`. |
-| Where should AI learn repo differences? | `ai/AI_PORTFOLIO_TOC.md`. |
-| Where should AI learn how the architecture style works? | `ai/BUILD_PHILOSOPHY.md`. |
-| Where are update instructions? | `ai/AI_UPDATE_INSTRUCTIONS.md` and `AGENTS.md`. |
-| Where is the LawFirm OS AI front door? | `LawFirm-os-semantic-substrate/registry/ai-front-door-registry.json`. |
-| Where is Logos authority? | `logos-fractal-theological-architecture`. |
-
----
-
-## Private repo rule
-
-Do not add private, limited-access, or unpublished repo details to this public map unless Lowell explicitly approves public disclosure.
+The sole private owner-approved reference is [DAD — private by request](https://github.com/lowelltwong-alt/Digital-Assett-Directory). No other private work is named or implied.

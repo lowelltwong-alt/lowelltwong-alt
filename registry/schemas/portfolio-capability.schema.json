@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lowelltwong-alt.github.io/schemas/portfolio-capability.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_id",
+    "observed_at",
+    "controlled_aliases",
+    "capabilities",
+    "global_non_claims"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "schemas/portfolio-capability.schema.json"
+    },
+    "schema_version": {
+      "const": "2.0.0"
+    },
+    "registry_id": {
+      "const": "lowelltwong-alt.portfolio-capability-evidence.v3"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "controlled_aliases": {
+      "const": [
+        "graph_engineering",
+        "knowledge_graphs",
+        "mcp_server",
+        "headless_ai_operations",
+        "multi_agent_workflows",
+        "agent_mesh",
+        "agent_swarm_workflows",
+        "deterministic_harnesses",
+        "probabilistic_evaluation",
+        "end_to_end_build",
+        "ai_governance",
+        "skill_supply_chain"
+      ]
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/capability"
+      }
+    },
+    "global_non_claims": {
+      "$ref": "#/$defs/nonClaims"
+    }
+  },
+  "$defs": {
+    "nonClaims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 3
+      }
+    },
+    "evidenceRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha",
+        "canonical_path",
+        "canonical_url",
+        "observation_time",
+        "evidence_class",
+        "access_level",
+        "source_owned",
+        "generated",
+        "non_claims",
+        "repository"
+      ],
+      "properties": {
+        "sha": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|not_public)$"
+        },
+        "canonical_path": {
+          "type": "string",
+          "pattern": "^(?:not_public|(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\\.(?:json|yaml|yml|md|py|toml))$"
+        },
+        "canonical_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "observation_time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence_class": {
+          "enum": [
+            "source_owned_public",
+            "owner_approved_private_reference"
+          ]
+        },
+        "access_level": {
+          "enum": [
+            "anonymous_public",
+            "after_authorized_access"
+          ]
+        },
+        "source_owned": {
+          "type": "boolean"
+        },
+        "generated": {
+          "type": "boolean"
+        },
+        "non_claims": {
+          "$ref": "#/$defs/nonClaims"
+        },
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alias",
+        "status",
+        "description",
+        "claim_ids",
+        "source_repositories",
+        "evidence_routes",
+        "access",
+        "non_claims"
+      ],
+      "properties": {
+        "alias": {
+          "enum": [
+            "graph_engineering",
+            "knowledge_graphs",
+            "mcp_server",
+            "headless_ai_operations",
+            "multi_agent_workflows",
+            "agent_mesh",
+            "agent_swarm_workflows",
+            "deterministic_harnesses",
+            "probabilistic_evaluation",
+            "end_to_end_build",
+            "ai_governance",
+            "skill_supply_chain"
+          ]
+        },
+        "status": {
+          "enum": [
+            "evidence_backed_public",
+            "bounded_public_reference",
+            "private_owner_approved_reference"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 3
+        },
+        "claim_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_.-]+$"
+          }
+        },
+        "source_repositories": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_routes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidenceRoute"
+          }
+        },
+        "access": {
+          "enum": [
+            "anonymous_public",
+            "after_authorized_access",
+            "mixed"
+          ]
+        },
+        "non_claims": {
+          "$ref": "#/$defs/nonClaims"
+        }
+      }
+    }
+  }
+}

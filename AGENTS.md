@@ -1,60 +1,23 @@
-# AGENTS.md — Profile Repo Instructions
+# Profile Repository Instructions
 
-This repo is the public profile and AI routing surface for `lowelltwong-alt`.
-
-Do not treat it as canonical authority for all target repos.
-
----
+This repository is a public human profile and machine-readable routing surface. It is not canonical authority for target-repository internals.
 
 ## Read first
 
-```text
-README.md
-AI_FRONT_DOOR.md
-ai/AI_PORTFOLIO_TOC.md
-ai/BUILD_PHILOSOPHY.md
-PUBLIC_REPO_MAP.md
-registry/profile-repo-routing-registry.json
-ai/AI_UPDATE_INSTRUCTIONS.md
-```
+1. `README.md`
+2. `AI_FRONT_DOOR.md`
+3. `PUBLIC_REPO_MAP.md`
+4. `registry/profile-repo-routing-registry.json`
+5. `registry/portfolio-capability-evidence.json`
+6. `ai/AI_UPDATE_INSTRUCTIONS.md`
 
----
+## Hard boundaries
 
-## Editing rules
+- Preserve the complete public inventory and registry/Markdown parity.
+- Use pinned, source-owned public evidence for displayed claims; generated reports are secondary.
+- DAD is the sole permitted private disclosure at `https://github.com/lowelltwong-alt/Digital-Assett-Directory`: private by request. Do not name, link, path, branch, artifact, test result, or infer any other private work.
+- Do not claim production deployment, real-data validation, autonomous execution, or LLM probabilistic evaluation.
+- The deterministic validation spine is Intake, Logos Scripture Graph, Orchestrator, and Skills Registry. Orphan Radar alone has bounded stochastic calibration for review-candidate ranking.
+- Mesh/swarm terms apply only to bounded development/workflow governance in Logos and DAD, never to a continuously operating autonomous product swarm.
 
-- Keep the README clean, polished, and human-facing.
-- Keep housekeeping in `ai/AI_UPDATE_INSTRUCTIONS.md` and this file.
-- Keep AI routing in `AI_FRONT_DOOR.md`, `ai/AI_PORTFOLIO_TOC.md`, and the registry.
-- Do not call AIRCA the flagship.
-- Do not invent repo names, schemas, endpoints, route IDs, event classes, or policy IDs.
-- Do not expose private repos.
-- Do not claim production readiness unless a target repo explicitly supports it.
-- Defer LawFirm OS authority to `LawFirm-os-semantic-substrate`.
-- Defer Logos/theological source authority to `logos-fractal-theological-architecture`.
-
----
-
-## Authority routes
-
-| Topic | Route |
-|---|---|
-| Public profile summary | `README.md` |
-| AI portfolio routing | `AI_FRONT_DOOR.md` |
-| Repo semantics | `ai/AI_PORTFOLIO_TOC.md` |
-| Build philosophy | `ai/BUILD_PHILOSOPHY.md` |
-| Public repo inventory | `PUBLIC_REPO_MAP.md` |
-| Machine-readable routing | `registry/profile-repo-routing-registry.json` |
-| Maintenance | `ai/AI_UPDATE_INSTRUCTIONS.md` |
-| LawFirm OS | `LawFirm-os-semantic-substrate` |
-| Logos AI | `logos-fractal-theological-architecture` |
-| AIRCA | `airca-fractal-decision-architecture`, supporting only |
-
----
-
-## Minimum validation
-
-```bash
-python -m json.tool registry/profile-repo-routing-registry.json > /tmp/profile-repo-routing-registry.validated.json
-```
-
-Report tests run and tests not run.
+Run `python scripts/validate_profile_package.py` after updates. Run the privacy-boundary scan before release preparation.

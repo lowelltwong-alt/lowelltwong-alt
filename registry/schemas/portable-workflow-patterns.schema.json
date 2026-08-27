@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lowelltwong-alt.github.io/schemas/portable-workflow-patterns.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "registry_id", "schema_version", "status", "authority_boundary", "reference_domain", "problem_class", "patterns", "non_claims"],
+  "properties": {
+    "$schema": {"const": "schemas/portable-workflow-patterns.schema.json"},
+    "registry_id": {"const": "lowelltwong_alt.portable_workflow_patterns.v1"},
+    "schema_version": {"const": "1.0"},
+    "status": {"const": "profile_orientation_metadata"},
+    "authority_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_repo_role",
+        "not_canonical_for_target_repo_internals",
+        "canonical_contract_authority",
+        "note"
+      ],
+      "properties": {
+        "profile_repo_role": {"const": "noncanonical portfolio interpretation surface"},
+        "not_canonical_for_target_repo_internals": {"const": true},
+        "canonical_contract_authority": {"const": "LawFirm-os-semantic-substrate"},
+        "note": {"type": "string", "minLength": 3}
+      }
+    },
+    "reference_domain": {"const": "legal_operations_insurance_defense"},
+    "problem_class": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "properties", "other_domains_with_same_properties"],
+      "properties": {
+        "label": {"const": "document_intensive_policy_constrained_multistage_expert_reviewed_workflow"},
+        "properties": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "other_domains_with_same_properties": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["legal", "portable", "public_evidence", "evidence_status"],
+        "properties": {
+          "legal": {"type": "string", "minLength": 1},
+          "portable": {"type": "string", "minLength": 1},
+          "public_evidence": {"type": "string", "minLength": 1},
+          "evidence_status": {
+            "enum": ["implemented_synthetic", "prototype_synthetic", "draft_contract_no_experiment_run"]
+          }
+        }
+      }
+    },
+    "non_claims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 3}
+    }
+  }
+}

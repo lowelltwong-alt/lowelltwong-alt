@@ -1,4 +1,5 @@
 {
+  "$schema": "schemas/portable-workflow-patterns.schema.json",
   "registry_id": "lowelltwong_alt.portable_workflow_patterns.v1",
   "schema_version": "1.0",
   "status": "profile_orientation_metadata",
