@@ -1,171 +1,33 @@
-# AI Front Door — lowelltwong-alt Profile
+# AI Front Door
 
-This is the AI entrypoint for the public `lowelltwong-alt` GitHub profile.
+This is the machine-navigation entrypoint for the public `lowelltwong-alt` portfolio. Start with the human summary in `README.md`, then use this file, `ai/AI_PORTFOLIO_TOC.md`, `PUBLIC_REPO_MAP.md`, and `registry/profile-repo-routing-registry.json`.
 
-The profile README is optimized for human scanning. This file is optimized for AI routing.
+The profile is a router, not canonical authority for target-repository internals. Prefer the target repository's pinned source evidence, README, front door, contracts, and governance files.
 
-Use this file to determine:
-
-- what the public repos do;
-- which repo owns which architectural concern;
-- which table of contents or front door to read next;
-- what is flagship versus supporting;
-- how to avoid inventing authority;
-- where future update instructions live.
-
----
-
-## Required read order for AI systems
-
-```text
-1. README.md
-2. AI_FRONT_DOOR.md
-3. ai/AI_PORTFOLIO_TOC.md
-4. PUBLIC_REPO_MAP.md
-5. registry/profile-repo-routing-registry.json
-6. PORTABILITY_MAP.md
-7. target repo README / AI front door / governance docs
-```
-
-To answer "what does this portfolio demonstrate, and does it transfer outside legal?", read
-`PORTABILITY_MAP.md` and `registry/portfolio-capability-evidence.json`. The capability registry
-states what is implemented, what is planned, and what is **not built** — do not infer capability
-from architecture documents alone.
-
-For a runnable demonstration rather than a contract, start at
-[`LawFirm-os-intake`](https://github.com/lowelltwong-alt/LawFirm-os-intake): one command turns a
-messy synthetic intake package into a human-reviewable matter-opening package and a driver-scaled
-budget proposal.
-
-For maintenance or future updates, continue to:
-
-```text
-ai/AI_UPDATE_INSTRUCTIONS.md
-AGENTS.md
-```
-
----
-
-## Authority boundary
-
-This profile repo is a **router**, not the canonical source for every project.
-
-| Surface | Role |
-|---|---|
-| `README.md` | Human landing page and professional signal surface. |
-| `AI_FRONT_DOOR.md` | AI entrypoint and routing index. |
-| `ai/AI_PORTFOLIO_TOC.md` | AI-readable explanation of repo families and what makes them distinct. |
-| `ai/BUILD_PHILOSOPHY.md` | How to understand the architecture style and design grammar. |
-| `PUBLIC_REPO_MAP.md` | Public repository inventory. |
-| `PORTABILITY_MAP.md` | How the legal reference domain maps to a general enterprise problem class, and what is not demonstrated yet. |
-| `registry/profile-repo-routing-registry.json` | Machine-readable route map. |
-| `registry/portable-workflow-patterns.json` | Machine-readable legal-to-enterprise pattern mapping. |
-| `registry/portfolio-capability-evidence.json` | Machine-readable capability status with implemented / planned / not-built labels. |
-| Target repo files | Canonical authority for that target repo. |
-
-Do not treat profile-level descriptions as canon when a target repo has a more specific README, registry, governance doc, schema, or AI front door.
-
----
-
-## Top-level routing
+## Routing rules
 
 | Intent | Route |
 |---|---|
-| Understand the public portfolio | `README.md` → `PUBLIC_REPO_MAP.md` |
-| Understand how Lowell builds systems | `ai/BUILD_PHILOSOPHY.md` |
-| Understand repo families and differences | `ai/AI_PORTFOLIO_TOC.md` |
-| Analyze LawFirm OS | `LawFirm-os-semantic-substrate/registry/ai-front-door-registry.json` |
-| Analyze Logos AI | `logos-fractal-theological-architecture/README.md` |
-| Analyze Noesis-style routing | This profile repo: `AI_FRONT_DOOR.md`, `PUBLIC_REPO_MAP.md`, routing registry |
-| Analyze AIRCA / LAIRCA | `airca-fractal-decision-architecture/README.md`, then Logos for theological/source-architecture context |
-| Update the profile package | `ai/AI_UPDATE_INSTRUCTIONS.md` and `AGENTS.md` |
+| Public portfolio inventory and classification | `PUBLIC_REPO_MAP.md` |
+| Machine-readable routes, claims, and evidence | `registry/profile-repo-routing-registry.json` |
+| Capability boundaries and non-claims | `registry/portfolio-capability-evidence.json` |
+| Architecture grammar | `ai/BUILD_PHILOSOPHY.md` |
+| Maintenance and release discipline | `ai/AI_UPDATE_INSTRUCTIONS.md` |
+| Private, access-controlled disclosure | [DAD — private by request](https://github.com/lowelltwong-alt/Digital-Assett-Directory) |
 
----
+## Interpret the portfolio correctly
 
-## Flagship versus supporting
+- The deterministic validation spine is **LawFirm OS Intake**, **Logos Scripture Graph**, **LawFirm OS Orchestrator**, and **LawFirm OS Skills Registry**.
+- **Orphan Radar** alone uses bounded stochastic calibration to rank review candidates; its public implementation uses classical graph and TF-IDF methods. Do not describe this as LLM probabilistic evaluation.
+- “Swarm” or “mesh” describes bounded development and workflow governance in Logos and DAD. It does not describe a continuously operating autonomous product swarm.
+- No public repo is evidence of production deployment, real client-data validation, autonomous execution authority, or mature end-to-end LLM evaluation.
 
-| Classification | Repos / systems |
-|---|---|
-| **Flagship** | LawFirm OS, anchored by `LawFirm-os-semantic-substrate`. |
-| **Primary source architecture** | Logos AI, anchored by `logos-fractal-theological-architecture`. |
-| **Profile-level AI router** | Noesis-style routing in the `lowelltwong-alt` profile repo. |
-| **Supporting decision architecture** | AIRCA / LAIRCA via `airca-fractal-decision-architecture`; useful context, not flagship. |
-| **Archive / legacy** | `lairca-logos-grounded-theological-model`. |
+## DAD: the sole private route
 
----
-
-## LawFirm OS routing
-
-For any LawFirm OS claim, start in the Semantic Substrate.
-
-```text
-LawFirm-os-semantic-substrate/registry/ai-front-door-registry.json
--> LawFirm-os-semantic-substrate/AI_TABLE_OF_CONTENTS.md
--> LawFirm-os-semantic-substrate/governance/CROSS_REPO_MAP.md
--> LawFirm-os-semantic-substrate/ENDPOINTS_AND_COMMANDS.md
--> target sibling repo
-```
-
-LawFirm OS repo roles:
-
-| Plane | Repo | Role |
-|---|---|---|
-| Control | `LawFirm-os-semantic-substrate` | Canonical schemas, registries, governance, route/event authority, roadmap, endpoint maps. |
-| Execution | `LawFirm-os-orchestrator` | Contract-locked orchestration and evidence packet generation. |
-| Evidence | `LawFirm-os-exceptions-lake-runtime` | Append-only runtime records and audit evidence. |
-| Legal knowledge | `LawFirm-os-legal-knowledge-runtime` | Synthetic legal ingestion, retrieval planning, Legal Context Bundle assembly. |
-| Skills / trust | `LawFirm-os-skills-registry` | Skill discovery, quarantine, scanning, grading, approval gates, and trust records. |
-| Vertical composition | `LawFirm-os-intake` | Runnable intake-to-budget workflow: composes and evaluates the vertical, owns no platform canon. **Start here for a working demonstration.** |
-
----
-
-## Logos / Noesis / AIRCA routing
-
-| System | What it means here | Route |
-|---|---|---|
-| **Logos AI** | Theological / ultimate-frame source architecture and Logos-grounded governance. | `logos-fractal-theological-architecture` |
-| **Noesis AI** | Portfolio-level intelligence router: helps AI know which repo to inspect and why. | This profile repo, especially `AI_FRONT_DOOR.md` and `ai/AI_PORTFOLIO_TOC.md` |
-| **AIRCA** | Supporting decision architecture: Architect, Inform, Rank, Commit, Act. | `airca-fractal-decision-architecture` |
-| **LAIRCA** | Logos-grounded Christian instantiation context. | Logos repo first; LAIRCA archive only for legacy/attribution context. |
-
-No separate public Noesis repo is assumed here. If one is created later, add it to the registry and repo map.
-
----
+[Digital Asset Directory (DAD) — private by request](https://github.com/lowelltwong-alt/Digital-Assett-Directory) is the only private route disclosed by this profile. After authorized access, it is a private local-first governed asset graph; a daemon/scheduler may be headless-capable, but deployment and current runtime are unasserted. Its local stdio MCP source is `src/digital_asset_directory/mcp_server.py`; it is read-only by default, records narrow receipts, and has no execution authority. Do not infer any other private work, path, branch, artifact, test result, source record, or product capability.
 
 ## Claim discipline
 
-Use these labels when answering from this profile:
+Treat a displayed capability as implemented only if its `claim_id` resolves to pinned, source-owned public evidence in the routing registry. Generated profile reports are secondary evidence. Preserve the registry labels: `public_proof`, `private_on_request`, `implementation`, `prototype`, `scaffold`, `planned`, and `archive`.
 
-| Label | Meaning |
-|---|---|
-| **Confirmed** | Directly supported by current repo files, public repo metadata, or inspected source text. |
-| **Inferred** | Logically derived from confirmed structure, but not directly stated. |
-| **Assumed** | A working assumption used to proceed. |
-| **Unknown** | Not available from current public evidence. |
-
-Do not invent:
-
-- repo names;
-- endpoint IDs;
-- schemas;
-- route IDs;
-- event classes;
-- canonical registries;
-- production-readiness claims;
-- private repo details;
-- authority boundaries not stated in the target repo.
-
----
-
-## Maintenance note
-
-Housekeeping and future-update instructions intentionally live outside the human landing page.
-
-Use:
-
-```text
-ai/AI_UPDATE_INSTRUCTIONS.md
-AGENTS.md
-```
-
-Do not add long maintenance checklists to `README.md`.
+For an AI-safe summary, say what the named source supports; label gaps as unknown. Do not invent repository names, schemas, endpoints, test results, release maturity, access paths, or deployment claims.

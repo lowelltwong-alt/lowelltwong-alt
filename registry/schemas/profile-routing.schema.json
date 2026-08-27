@@ -1,0 +1,426 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lowelltwong-alt.github.io/schemas/profile-routing.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_id",
+    "observed_at",
+    "inventory_source",
+    "public_inventory_count",
+    "controlled_aliases",
+    "non_claims",
+    "repositories",
+    "private_routes",
+    "claims"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "schemas/profile-routing.schema.json"
+    },
+    "schema_version": {
+      "const": "2.0.0"
+    },
+    "registry_id": {
+      "const": "lowelltwong-alt.profile-routing.v2"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "inventory_source": {
+      "type": "string",
+      "format": "uri"
+    },
+    "public_inventory_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "controlled_aliases": {
+      "const": [
+        "graph_engineering",
+        "knowledge_graphs",
+        "mcp_server",
+        "headless_ai_operations",
+        "multi_agent_workflows",
+        "agent_mesh",
+        "agent_swarm_workflows",
+        "deterministic_harnesses",
+        "probabilistic_evaluation",
+        "end_to_end_build",
+        "ai_governance",
+        "skill_supply_chain"
+      ]
+    },
+    "non_claims": {
+      "$ref": "#/$defs/nonClaims"
+    },
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/publicRepository"
+      }
+    },
+    "private_routes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "$ref": "#/$defs/privateRoute"
+      }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    }
+  },
+  "$defs": {
+    "nonClaims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 3
+      }
+    },
+    "priority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "reason"
+      ],
+      "properties": {
+        "value": {
+          "enum": [
+            "featured",
+            "supporting",
+            "deprioritized",
+            "archive"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 3
+        }
+      }
+    },
+    "evidenceRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha",
+        "canonical_path",
+        "canonical_url",
+        "observation_time",
+        "evidence_class",
+        "access_level",
+        "source_owned",
+        "generated",
+        "non_claims",
+        "repository"
+      ],
+      "properties": {
+        "sha": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|not_public)$"
+        },
+        "canonical_path": {
+          "type": "string",
+          "pattern": "^(?:not_public|(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\\.(?:json|yaml|yml|md|py|toml))$"
+        },
+        "canonical_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "observation_time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence_class": {
+          "enum": [
+            "source_owned_public",
+            "owner_approved_private_reference"
+          ]
+        },
+        "access_level": {
+          "enum": [
+            "anonymous_public",
+            "after_authorized_access"
+          ]
+        },
+        "source_owned": {
+          "type": "boolean"
+        },
+        "generated": {
+          "type": "boolean"
+        },
+        "non_claims": {
+          "$ref": "#/$defs/nonClaims"
+        },
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "publicRepository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "canonical_url",
+        "visibility",
+        "delivery",
+        "maturity",
+        "validation_state",
+        "priority",
+        "capability_tags",
+        "claim_ids",
+        "pinned_public_sha",
+        "observed_at",
+        "evidence_routes",
+        "access",
+        "non_claims",
+        "pin_policy"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$"
+        },
+        "canonical_url": {
+          "type": "string",
+          "pattern": "^https://github\\.com/lowelltwong-alt/[A-Za-z0-9-]+$"
+        },
+        "visibility": {
+          "const": "public"
+        },
+        "delivery": {
+          "enum": [
+            "public_proof",
+            "implementation",
+            "prototype",
+            "scaffold",
+            "planned",
+            "archive"
+          ]
+        },
+        "maturity": {
+          "enum": [
+            "public_contract",
+            "public_reference",
+            "public_mvp",
+            "public_implementation",
+            "public_architecture",
+            "public_substrate",
+            "profile_router",
+            "candidate_only",
+            "draft",
+            "skeletal",
+            "scaffold_only",
+            "archived"
+          ]
+        },
+        "validation_state": {
+          "enum": [
+            "source_described",
+            "partially_asserted",
+            "not_asserted",
+            "not_applicable"
+          ]
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        },
+        "capability_tags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        },
+        "claim_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_.-]+$"
+          }
+        },
+        "pinned_public_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence_routes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidenceRoute"
+          }
+        },
+        "access": {
+          "const": "anonymous_public"
+        },
+        "non_claims": {
+          "$ref": "#/$defs/nonClaims"
+        },
+        "pin_policy": {
+          "enum": [
+            "exact_default_head",
+            "self_referential_ancestor"
+          ]
+        }
+      }
+    },
+    "privateRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "canonical_url",
+        "visibility",
+        "delivery",
+        "maturity",
+        "validation_state",
+        "priority",
+        "capability_tags",
+        "claim_ids",
+        "pinned_public_sha",
+        "observed_at",
+        "evidence_routes",
+        "access",
+        "non_claims",
+        "pin_policy"
+      ],
+      "properties": {
+        "name": {
+          "const": "Digital Asset Directory"
+        },
+        "canonical_url": {
+          "const": "https://github.com/lowelltwong-alt/Digital-Assett-Directory"
+        },
+        "visibility": {
+          "const": "private_owner_approved_reference"
+        },
+        "delivery": {
+          "const": "private_on_request"
+        },
+        "maturity": {
+          "const": "runtime_unasserted"
+        },
+        "validation_state": {
+          "const": "owner_approved_description_only"
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        },
+        "capability_tags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        },
+        "claim_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_.-]+$"
+          }
+        },
+        "pinned_public_sha": {
+          "const": "not_public"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence_routes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidenceRoute"
+          }
+        },
+        "access": {
+          "const": "after_authorized_access"
+        },
+        "non_claims": {
+          "$ref": "#/$defs/nonClaims"
+        },
+        "pin_policy": {
+          "const": "owner_approved_reference"
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "statement",
+        "source_repositories",
+        "evidence_routes",
+        "access",
+        "non_claims"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_.-]+$"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 3
+        },
+        "source_repositories": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_routes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidenceRoute"
+          }
+        },
+        "access": {
+          "enum": [
+            "anonymous_public",
+            "after_authorized_access"
+          ]
+        },
+        "non_claims": {
+          "$ref": "#/$defs/nonClaims"
+        }
+      }
+    }
+  }
+}

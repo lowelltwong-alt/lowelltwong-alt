@@ -1,0 +1,12 @@
+{
+  "$schema":"../schemas/release-receipt.schema.json",
+  "schema_version":"2.0.0",
+  "receipt_id":"profile-content-candidate-20260827",
+  "status":"content_candidate_public_safe",
+  "observed_at":"2026-08-27T20:03:00Z",
+  "public_inventory_count":17,
+  "evidence_class":"generated_secondary",
+  "public_safety":"public_safe_candidate",
+  "release_authorized":false,
+  "non_claims":["Append-only public-safe candidate receipt.","Does not authorize release, deployment, or a merged closure."]
+}

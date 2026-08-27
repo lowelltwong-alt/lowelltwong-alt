@@ -1,206 +1,1746 @@
 {
-  "schema_version": "0.2",
-  "registry_id": "lowelltwong_alt.profile_repo_router.v0_2",
-  "status": "profile_orientation_and_ai_routing_surface",
-  "observed_public_repositories_as_of": "2026-07-27",
-  "human_readme_policy": {
-    "purpose": "high-signal human landing page",
-    "keep_housekeeping_out_of_readme": true,
-    "ai_entrypoint_in_readme": "AI_FRONT_DOOR.md",
-    "do_not_overtly_target_employers_or_recruiters": true
-  },
-  "authority_boundary": {
-    "profile_repo_role": "human landing page and AI routing surface",
-    "repo_local_authority_wins": true,
-    "not_canonical_for_target_repo_internals": true,
-    "do_not_publish_private_repo_details_without_human_approval": true
-  },
-  "routing_surfaces": {
-    "human_landing_page": "README.md",
-    "ai_front_door": "AI_FRONT_DOOR.md",
-    "ai_portfolio_toc": "ai/AI_PORTFOLIO_TOC.md",
-    "build_philosophy": "ai/BUILD_PHILOSOPHY.md",
-    "public_repo_map": "PUBLIC_REPO_MAP.md",
-    "ai_update_instructions": "ai/AI_UPDATE_INSTRUCTIONS.md",
-    "agent_instructions": "AGENTS.md",
-    "machine_registry": "registry/profile-repo-routing-registry.json",
-    "portability_map": "PORTABILITY_MAP.md",
-    "portable_workflow_patterns": "registry/portable-workflow-patterns.json",
-    "portfolio_capability_evidence": "registry/portfolio-capability-evidence.json"
-  },
-  "portfolio_layers": [
-    {
-      "id": "lawfirm_os",
-      "label": "LawFirm OS",
-      "classification": "flagship",
-      "primary_repo": "LawFirm-os-semantic-substrate",
-      "primary_front_door": "LawFirm-os-semantic-substrate/registry/ai-front-door-registry.json",
-      "role": "Governed legal-AI operating architecture with separated control, execution, evidence, legal knowledge, and skills planes."
-    },
-    {
-      "id": "logos_ai",
-      "label": "Logos AI",
-      "classification": "primary_source_architecture",
-      "primary_repo": "logos-fractal-theological-architecture",
-      "primary_front_door": "logos-fractal-theological-architecture/README.md",
-      "role": "Theological and ultimate-frame source architecture for Logos-grounded governance and LAIRCA-style use."
-    },
-    {
-      "id": "noesis_style_routing",
-      "label": "Noesis-style profile routing",
-      "classification": "profile_level_router",
-      "primary_repo": "lowelltwong-alt",
-      "primary_front_door": "AI_FRONT_DOOR.md",
-      "role": "Portfolio-level intelligence router for public repos and AI entrypoints. No separate public Noesis repo assumed."
-    },
-    {
-      "id": "airca_lairca",
-      "label": "AIRCA / LAIRCA",
-      "classification": "supporting_decision_architecture_not_flagship",
-      "primary_repo": "airca-fractal-decision-architecture",
-      "primary_front_door": "airca-fractal-decision-architecture/README.md",
-      "role": "Supporting AI-era decision architecture and Logos-grounded Christian instantiation context."
-    }
+  "$schema": "schemas/profile-routing.schema.json",
+  "schema_version": "2.0.0",
+  "registry_id": "lowelltwong-alt.profile-routing.v2",
+  "observed_at": "2026-08-27T20:03:00Z",
+  "inventory_source": "https://api.github.com/users/lowelltwong-alt/repos?per_page=100&type=owner",
+  "public_inventory_count": 17,
+  "controlled_aliases": [
+    "graph_engineering",
+    "knowledge_graphs",
+    "mcp_server",
+    "headless_ai_operations",
+    "multi_agent_workflows",
+    "agent_mesh",
+    "agent_swarm_workflows",
+    "deterministic_harnesses",
+    "probabilistic_evaluation",
+    "end_to_end_build",
+    "ai_governance",
+    "skill_supply_chain"
   ],
-  "public_repositories": [
-    {
-      "name": "lowelltwong-alt",
-      "url": "https://github.com/lowelltwong-alt/lowelltwong-alt",
-      "classification": "profile_router",
-      "family": "noesis_style_routing",
-      "role": "Human landing page and AI routing surface.",
-      "ai_start": [
-        "README.md",
-        "AI_FRONT_DOOR.md",
-        "ai/AI_PORTFOLIO_TOC.md",
-        "PUBLIC_REPO_MAP.md"
-      ]
-    },
-    {
-      "name": "LawFirm-os-semantic-substrate",
-      "url": "https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate",
-      "classification": "flagship",
-      "family": "lawfirm_os",
-      "plane": "control",
-      "role": "Canonical schemas, registries, governance, route/event authority, endpoint maps, and roadmap authority.",
-      "ai_start": [
-        "registry/ai-front-door-registry.json",
-        "AI_TABLE_OF_CONTENTS.md",
-        "governance/CROSS_REPO_MAP.md",
-        "ENDPOINTS_AND_COMMANDS.md"
-      ]
-    },
-    {
-      "name": "LawFirm-os-orchestrator",
-      "url": "https://github.com/lowelltwong-alt/LawFirm-os-orchestrator",
-      "classification": "active_public",
-      "family": "lawfirm_os",
-      "plane": "execution",
-      "role": "Contract-locked orchestration, autonomy classification, harness selection, and evidence packet generation.",
-      "ai_start": [
-        "README.md",
-        "AGENTS.md",
-        "AI_WORK_START_HERE.md"
-      ]
-    },
-    {
-      "name": "LawFirm-os-exceptions-lake-runtime",
-      "url": "https://github.com/lowelltwong-alt/LawFirm-os-exceptions-lake-runtime",
-      "classification": "active_public",
-      "family": "lawfirm_os",
-      "plane": "evidence",
-      "role": "Append-only runtime records, synthetic exception intake, validation outcomes, and audit evidence.",
-      "ai_start": [
-        "README.md",
-        "docs/RUNTIME_BOUNDARY.md",
-        "AI_WORK_START_HERE.md"
-      ]
-    },
-    {
-      "name": "LawFirm-os-legal-knowledge-runtime",
-      "url": "https://github.com/lowelltwong-alt/LawFirm-os-legal-knowledge-runtime",
-      "classification": "active_public",
-      "family": "lawfirm_os",
-      "plane": "legal_knowledge_runtime",
-      "role": "Synthetic legal ingestion preflight, retrieval planning, and Legal Context Bundle assembly.",
-      "ai_start": [
-        "README.md",
-        "LawFirm-os-semantic-substrate/registry/ai-front-door-registry.json"
-      ]
-    },
-    {
-      "name": "LawFirm-os-skills-registry",
-      "url": "https://github.com/lowelltwong-alt/LawFirm-os-skills-registry",
-      "classification": "active_public",
-      "family": "lawfirm_os",
-      "plane": "skills_trust",
-      "role": "Skill discovery, quarantine, scanning, grading, approval gates, and trust records.",
-      "ai_start": [
-        "AI_WORK_START_HERE.md",
-        "LawFirm-os-semantic-substrate/registry/ai-front-door-registry.json"
-      ]
-    },
-    {
-      "name": "LawFirm-os-intake",
-      "url": "https://github.com/lowelltwong-alt/LawFirm-os-intake",
-      "classification": "active_public",
-      "family": "lawfirm_os",
-      "plane": "vertical_workflow_composition",
-      "role": "Runnable intake-to-budget vertical: messy synthetic intake to a human-reviewable matter-opening package and driver-scaled UTBMS budget proposal. Composes and evaluates; owns no platform canon.",
-      "ai_start": [
-        "README.md",
-        "GOVERNANCE_BOUNDARY.md",
-        "docs/decisions/",
-        "VISIBILITY_AND_RELEASE.md"
-      ]
-    },
-    {
-      "name": "logos-fractal-theological-architecture",
-      "url": "https://github.com/lowelltwong-alt/logos-fractal-theological-architecture",
-      "classification": "primary_source_architecture",
-      "family": "logos_ai",
-      "role": "Theological and ultimate-frame source architecture for Logos-grounded governance and LAIRCA-style use.",
-      "ai_start": [
-        "README.md",
-        "docs/governance/",
-        "docs/roadmap/"
-      ]
-    },
+  "non_claims": [
+    "No production deployment is asserted.",
+    "No real client-data validation is asserted.",
+    "No autonomous execution authority is asserted.",
+    "No LLM probabilistic evaluation is asserted."
+  ],
+  "repositories": [
     {
       "name": "airca-fractal-decision-architecture",
-      "url": "https://github.com/lowelltwong-alt/airca-fractal-decision-architecture",
-      "classification": "supporting_public_draft_not_flagship",
-      "family": "airca_lairca",
-      "role": "Supporting AI-era decision architecture: AIRCA, UAIRCA, LAIRCA, fractal taxonomy, ontology, decision memory, and machine-readable artifacts. Not flagship.",
-      "ai_start": [
-        "README.md"
-      ]
+      "canonical_url": "https://github.com/lowelltwong-alt/airca-fractal-decision-architecture",
+      "visibility": "public",
+      "delivery": "prototype",
+      "maturity": "draft",
+      "validation_state": "not_asserted",
+      "priority": {
+        "value": "supporting",
+        "reason": "Supporting decision architecture, not flagship."
+      },
+      "capability_tags": [
+        "decision_architecture"
+      ],
+      "claim_ids": [
+        "repo.airca.scope"
+      ],
+      "pinned_public_sha": "ef0947ea93b22382fc76379acc1beee3b9126e38",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "ef0947ea93b22382fc76379acc1beee3b9126e38",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/airca-fractal-decision-architecture/blob/ef0947ea93b22382fc76379acc1beee3b9126e38/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Supporting context only."
+          ],
+          "repository": "airca-fractal-decision-architecture"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Not flagship."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "claude-legal-audit-lab",
+      "canonical_url": "https://github.com/lowelltwong-alt/claude-legal-audit-lab",
+      "visibility": "public",
+      "delivery": "prototype",
+      "maturity": "candidate_only",
+      "validation_state": "source_described",
+      "priority": {
+        "value": "deprioritized",
+        "reason": "Candidate-only public audit-harness prototype."
+      },
+      "capability_tags": [
+        "evidence_first_audit"
+      ],
+      "claim_ids": [
+        "repo.claude_audit.scope"
+      ],
+      "pinned_public_sha": "f1ade27283eeac7c5fd49dd75d6747d2c21a0d17",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "f1ade27283eeac7c5fd49dd75d6747d2c21a0d17",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/claude-legal-audit-lab/blob/f1ade27283eeac7c5fd49dd75d6747d2c21a0d17/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Candidate-only public evidence."
+          ],
+          "repository": "claude-legal-audit-lab"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Candidate-only maturity."
+      ],
+      "pin_policy": "exact_default_head"
     },
     {
       "name": "lairca-logos-grounded-theological-model",
-      "url": "https://github.com/lowelltwong-alt/lairca-logos-grounded-theological-model",
-      "classification": "archive_legacy",
-      "family": "logos_ai",
-      "role": "Archived LAIRCA Logos-grounded theological model and attribution/license surface.",
-      "ai_start": [
-        "README.md",
-        "logos-fractal-theological-architecture/README.md"
-      ]
+      "canonical_url": "https://github.com/lowelltwong-alt/lairca-logos-grounded-theological-model",
+      "visibility": "public",
+      "delivery": "archive",
+      "maturity": "archived",
+      "validation_state": "not_applicable",
+      "priority": {
+        "value": "archive",
+        "reason": "Historical attribution context."
+      },
+      "capability_tags": [
+        "legacy_theological_model"
+      ],
+      "claim_ids": [
+        "repo.lairca.scope"
+      ],
+      "pinned_public_sha": "84bb0478c84b04df838114fc50703baa7d3f3f7a",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "84bb0478c84b04df838114fc50703baa7d3f3f7a",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/lairca-logos-grounded-theological-model/blob/84bb0478c84b04df838114fc50703baa7d3f3f7a/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Archived context only."
+          ],
+          "repository": "lairca-logos-grounded-theological-model"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Not current architecture authority."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "law-firm-digital-twin",
+      "canonical_url": "https://github.com/lowelltwong-alt/law-firm-digital-twin",
+      "visibility": "public",
+      "delivery": "prototype",
+      "maturity": "candidate_only",
+      "validation_state": "partially_asserted",
+      "priority": {
+        "value": "supporting",
+        "reason": "Synthetic simulation candidate."
+      },
+      "capability_tags": [
+        "synthetic_simulation"
+      ],
+      "claim_ids": [
+        "repo.digital_twin.scope"
+      ],
+      "pinned_public_sha": "0f2d97b405e156ce1086aea157c02d09dac32bca",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "0f2d97b405e156ce1086aea157c02d09dac32bca",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/law-firm-digital-twin/blob/0f2d97b405e156ce1086aea157c02d09dac32bca/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Synthetic candidate only."
+          ],
+          "repository": "law-firm-digital-twin"
+        },
+        {
+          "repository": "law-firm-digital-twin",
+          "sha": "0f2d97b405e156ce1086aea157c02d09dac32bca",
+          "canonical_path": "src/law_firm_digital_twin/specialist_mesh.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/law-firm-digital-twin/blob/0f2d97b405e156ce1086aea157c02d09dac32bca/src/law_firm_digital_twin/specialist_mesh.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "law-firm-digital-twin",
+          "sha": "0f2d97b405e156ce1086aea157c02d09dac32bca",
+          "canonical_path": "tests/test_specialist_mesh.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/law-firm-digital-twin/blob/0f2d97b405e156ce1086aea157c02d09dac32bca/tests/test_specialist_mesh.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No deployment claim."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "LawFirm-os-exceptions-lake-runtime",
+      "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-exceptions-lake-runtime",
+      "visibility": "public",
+      "delivery": "implementation",
+      "maturity": "public_mvp",
+      "validation_state": "source_described",
+      "priority": {
+        "value": "supporting",
+        "reason": "Evidence-plane public MVP."
+      },
+      "capability_tags": [
+        "exception_evidence",
+        "append_only_audit"
+      ],
+      "claim_ids": [
+        "repo.exceptions.scope"
+      ],
+      "pinned_public_sha": "bf5e29411d119d3ca4041b31f24a978f3715aae7",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "bf5e29411d119d3ca4041b31f24a978f3715aae7",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-exceptions-lake-runtime/blob/bf5e29411d119d3ca4041b31f24a978f3715aae7/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Non-production MVP."
+          ],
+          "repository": "LawFirm-os-exceptions-lake-runtime"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No production claim."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "LawFirm-os-intake",
+      "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-intake",
+      "visibility": "public",
+      "delivery": "implementation",
+      "maturity": "public_reference",
+      "validation_state": "source_described",
+      "priority": {
+        "value": "featured",
+        "reason": "Public synthetic reference workflow."
+      },
+      "capability_tags": [
+        "synthetic_intake",
+        "human_review",
+        "deterministic_validation"
+      ],
+      "claim_ids": [
+        "repo.intake.scope"
+      ],
+      "pinned_public_sha": "2d357bbd1432ba36ac621f895bb47df0ad7a2a90",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "2d357bbd1432ba36ac621f895bb47df0ad7a2a90",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-intake/blob/2d357bbd1432ba36ac621f895bb47df0ad7a2a90/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Pinned public source evidence only."
+          ],
+          "repository": "LawFirm-os-intake"
+        },
+        {
+          "sha": "2d357bbd1432ba36ac621f895bb47df0ad7a2a90",
+          "canonical_path": "AI_FRONT_DOOR.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-intake/blob/2d357bbd1432ba36ac621f895bb47df0ad7a2a90/AI_FRONT_DOOR.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Synthetic/public-source evidence only."
+          ],
+          "repository": "LawFirm-os-intake"
+        },
+        {
+          "repository": "LawFirm-os-intake",
+          "sha": "2d357bbd1432ba36ac621f895bb47df0ad7a2a90",
+          "canonical_path": "docs/agent-architecture.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-intake/blob/2d357bbd1432ba36ac621f895bb47df0ad7a2a90/docs/agent-architecture.md",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-intake",
+          "sha": "2d357bbd1432ba36ac621f895bb47df0ad7a2a90",
+          "canonical_path": "src/lawfirm_os_intake/case_pipeline.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-intake/blob/2d357bbd1432ba36ac621f895bb47df0ad7a2a90/src/lawfirm_os_intake/case_pipeline.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-intake",
+          "sha": "2d357bbd1432ba36ac621f895bb47df0ad7a2a90",
+          "canonical_path": "tests/test_case_pipeline.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-intake/blob/2d357bbd1432ba36ac621f895bb47df0ad7a2a90/tests/test_case_pipeline.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Synthetic and human-reviewable only."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "LawFirm-os-legal-knowledge-runtime",
+      "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-legal-knowledge-runtime",
+      "visibility": "public",
+      "delivery": "implementation",
+      "maturity": "public_mvp",
+      "validation_state": "source_described",
+      "priority": {
+        "value": "supporting",
+        "reason": "Local-first synthetic-first MVP scope."
+      },
+      "capability_tags": [
+        "legal_context",
+        "retrieval_planning"
+      ],
+      "claim_ids": [
+        "repo.legal_knowledge.scope"
+      ],
+      "pinned_public_sha": "7b2714080c33c0af2bd4ed9b6d8381deb2d35814",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "7b2714080c33c0af2bd4ed9b6d8381deb2d35814",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-legal-knowledge-runtime/blob/7b2714080c33c0af2bd4ed9b6d8381deb2d35814/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Synthetic-first MVP."
+          ],
+          "repository": "LawFirm-os-legal-knowledge-runtime"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No legal advice claim."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "LawFirm-os-orchestrator",
+      "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-orchestrator",
+      "visibility": "public",
+      "delivery": "implementation",
+      "maturity": "public_mvp",
+      "validation_state": "source_described",
+      "priority": {
+        "value": "featured",
+        "reason": "Public contract-governed execution plane."
+      },
+      "capability_tags": [
+        "contract_governed_execution",
+        "deterministic_validation"
+      ],
+      "claim_ids": [
+        "repo.orchestrator.scope"
+      ],
+      "pinned_public_sha": "5bf9ec7ffa71de702cca9cc6c764003713c17f15",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "5bf9ec7ffa71de702cca9cc6c764003713c17f15",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-orchestrator/blob/5bf9ec7ffa71de702cca9cc6c764003713c17f15/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "No semantic-canon ownership."
+          ],
+          "repository": "LawFirm-os-orchestrator"
+        },
+        {
+          "sha": "5bf9ec7ffa71de702cca9cc6c764003713c17f15",
+          "canonical_path": "AI_FRONT_DOOR.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-orchestrator/blob/5bf9ec7ffa71de702cca9cc6c764003713c17f15/AI_FRONT_DOOR.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "No autonomous runtime claim."
+          ],
+          "repository": "LawFirm-os-orchestrator"
+        },
+        {
+          "repository": "LawFirm-os-orchestrator",
+          "sha": "5bf9ec7ffa71de702cca9cc6c764003713c17f15",
+          "canonical_path": "src/lawfirm_os_orchestrator/harness/agent_committee.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-orchestrator/blob/5bf9ec7ffa71de702cca9cc6c764003713c17f15/src/lawfirm_os_orchestrator/harness/agent_committee.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-orchestrator",
+          "sha": "5bf9ec7ffa71de702cca9cc6c764003713c17f15",
+          "canonical_path": "src/lawfirm_os_orchestrator/authority/execution_authority.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-orchestrator/blob/5bf9ec7ffa71de702cca9cc6c764003713c17f15/src/lawfirm_os_orchestrator/authority/execution_authority.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-orchestrator",
+          "sha": "5bf9ec7ffa71de702cca9cc6c764003713c17f15",
+          "canonical_path": "tests/test_execution_authority.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-orchestrator/blob/5bf9ec7ffa71de702cca9cc6c764003713c17f15/tests/test_execution_authority.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-orchestrator",
+          "sha": "5bf9ec7ffa71de702cca9cc6c764003713c17f15",
+          "canonical_path": "src/lawfirm_os_orchestrator/intake/vertical_slice_demo.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-orchestrator/blob/5bf9ec7ffa71de702cca9cc6c764003713c17f15/src/lawfirm_os_orchestrator/intake/vertical_slice_demo.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-orchestrator",
+          "sha": "5bf9ec7ffa71de702cca9cc6c764003713c17f15",
+          "canonical_path": "tests/test_intake_vertical_slice_demo.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-orchestrator/blob/5bf9ec7ffa71de702cca9cc6c764003713c17f15/tests/test_intake_vertical_slice_demo.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No autonomous execution authority."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "LawFirm-os-semantic-substrate",
+      "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate",
+      "visibility": "public",
+      "delivery": "public_proof",
+      "maturity": "public_contract",
+      "validation_state": "source_described",
+      "priority": {
+        "value": "featured",
+        "reason": "Public LawFirm OS contract authority."
+      },
+      "capability_tags": [
+        "semantic_governance",
+        "contract_authority"
+      ],
+      "claim_ids": [
+        "repo.substrate.scope"
+      ],
+      "pinned_public_sha": "54bdb2ac5261d5626e3fa946a2c18ff2b677ea08",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "54bdb2ac5261d5626e3fa946a2c18ff2b677ea08",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate/blob/54bdb2ac5261d5626e3fa946a2c18ff2b677ea08/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Not a production runtime."
+          ],
+          "repository": "LawFirm-os-semantic-substrate"
+        },
+        {
+          "repository": "LawFirm-os-semantic-substrate",
+          "sha": "54bdb2ac5261d5626e3fa946a2c18ff2b677ea08",
+          "canonical_path": "schema/types/named_graph_manifest.yaml",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate/blob/54bdb2ac5261d5626e3fa946a2c18ff2b677ea08/schema/types/named_graph_manifest.yaml",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-semantic-substrate",
+          "sha": "54bdb2ac5261d5626e3fa946a2c18ff2b677ea08",
+          "canonical_path": "scripts/phase3/check_graph_partitions.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate/blob/54bdb2ac5261d5626e3fa946a2c18ff2b677ea08/scripts/phase3/check_graph_partitions.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-semantic-substrate",
+          "sha": "54bdb2ac5261d5626e3fa946a2c18ff2b677ea08",
+          "canonical_path": "manifests/contract_manifest.v1.json",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate/blob/54bdb2ac5261d5626e3fa946a2c18ff2b677ea08/manifests/contract_manifest.v1.json",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-semantic-substrate",
+          "sha": "54bdb2ac5261d5626e3fa946a2c18ff2b677ea08",
+          "canonical_path": "registry/skill-agent-control-plane-registry.json",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate/blob/54bdb2ac5261d5626e3fa946a2c18ff2b677ea08/registry/skill-agent-control-plane-registry.json",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-semantic-substrate",
+          "sha": "54bdb2ac5261d5626e3fa946a2c18ff2b677ea08",
+          "canonical_path": "scripts/validate_skill_agent_control_plane.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate/blob/54bdb2ac5261d5626e3fa946a2c18ff2b677ea08/scripts/validate_skill_agent_control_plane.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Not a production runtime."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "LawFirm-os-skills-registry",
+      "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-skills-registry",
+      "visibility": "public",
+      "delivery": "implementation",
+      "maturity": "public_mvp",
+      "validation_state": "source_described",
+      "priority": {
+        "value": "featured",
+        "reason": "Public skill supply-chain controls."
+      },
+      "capability_tags": [
+        "skill_supply_chain",
+        "deterministic_validation"
+      ],
+      "claim_ids": [
+        "repo.skills.scope"
+      ],
+      "pinned_public_sha": "1fe195ef39af0064e1066cae8890c8a944d06949",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "1fe195ef39af0064e1066cae8890c8a944d06949",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-skills-registry/blob/1fe195ef39af0064e1066cae8890c8a944d06949/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "No autonomy claim."
+          ],
+          "repository": "LawFirm-os-skills-registry"
+        },
+        {
+          "sha": "1fe195ef39af0064e1066cae8890c8a944d06949",
+          "canonical_path": "src/lawfirm_os_skills_registry/qa/freshness_validator.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-skills-registry/blob/1fe195ef39af0064e1066cae8890c8a944d06949/src/lawfirm_os_skills_registry/qa/freshness_validator.py",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path, not test-result evidence."
+          ],
+          "repository": "LawFirm-os-skills-registry"
+        },
+        {
+          "repository": "LawFirm-os-skills-registry",
+          "sha": "1fe195ef39af0064e1066cae8890c8a944d06949",
+          "canonical_path": "src/lawfirm_os_skills_registry/evaluation/fixture_harness.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-skills-registry/blob/1fe195ef39af0064e1066cae8890c8a944d06949/src/lawfirm_os_skills_registry/evaluation/fixture_harness.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-skills-registry",
+          "sha": "1fe195ef39af0064e1066cae8890c8a944d06949",
+          "canonical_path": "src/lawfirm_os_skills_registry/intake/importer.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-skills-registry/blob/1fe195ef39af0064e1066cae8890c8a944d06949/src/lawfirm_os_skills_registry/intake/importer.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-skills-registry",
+          "sha": "1fe195ef39af0064e1066cae8890c8a944d06949",
+          "canonical_path": "src/lawfirm_os_skills_registry/security/scanner.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-skills-registry/blob/1fe195ef39af0064e1066cae8890c8a944d06949/src/lawfirm_os_skills_registry/security/scanner.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "LawFirm-os-skills-registry",
+          "sha": "1fe195ef39af0064e1066cae8890c8a944d06949",
+          "canonical_path": "src/lawfirm_os_skills_registry/registry/store.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-skills-registry/blob/1fe195ef39af0064e1066cae8890c8a944d06949/src/lawfirm_os_skills_registry/registry/store.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No autonomous execution claim."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "logos-boundary-literature",
+      "canonical_url": "https://github.com/lowelltwong-alt/logos-boundary-literature",
+      "visibility": "public",
+      "delivery": "scaffold",
+      "maturity": "scaffold_only",
+      "validation_state": "not_asserted",
+      "priority": {
+        "value": "supporting",
+        "reason": "Governed scaffold with no source texts."
+      },
+      "capability_tags": [
+        "boundary_literature",
+        "source_separation"
+      ],
+      "claim_ids": [
+        "repo.boundary.scope"
+      ],
+      "pinned_public_sha": "9defaa58fa34a1ce9f0791ccdc2b4e28e99e4046",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "9defaa58fa34a1ce9f0791ccdc2b4e28e99e4046",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-boundary-literature/blob/9defaa58fa34a1ce9f0791ccdc2b4e28e99e4046/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "No source texts."
+          ],
+          "repository": "logos-boundary-literature"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Scaffold only."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "logos-doctrine-genealogy",
+      "canonical_url": "https://github.com/lowelltwong-alt/logos-doctrine-genealogy",
+      "visibility": "public",
+      "delivery": "scaffold",
+      "maturity": "scaffold_only",
+      "validation_state": "not_asserted",
+      "priority": {
+        "value": "supporting",
+        "reason": "Data-free scaffold until governed data gates exist."
+      },
+      "capability_tags": [
+        "doctrine_lineage",
+        "profile_comparison"
+      ],
+      "claim_ids": [
+        "repo.doctrine.scope"
+      ],
+      "pinned_public_sha": "add1aad9816e9b3d9a0977b9e73578c530aaf332",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "add1aad9816e9b3d9a0977b9e73578c530aaf332",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-doctrine-genealogy/blob/add1aad9816e9b3d9a0977b9e73578c530aaf332/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Data-free scaffold."
+          ],
+          "repository": "logos-doctrine-genealogy"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Scaffold only."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "logos-governance-architecture",
+      "canonical_url": "https://github.com/lowelltwong-alt/logos-governance-architecture",
+      "visibility": "public",
+      "delivery": "public_proof",
+      "maturity": "public_architecture",
+      "validation_state": "source_described",
+      "priority": {
+        "value": "featured",
+        "reason": "Public theological governance route."
+      },
+      "capability_tags": [
+        "theological_governance",
+        "source_trust",
+        "bounded_workflow_governance"
+      ],
+      "claim_ids": [
+        "repo.logos_governance.scope"
+      ],
+      "pinned_public_sha": "f320d8430c10f82d4fdd80567c4d533fa90c25d5",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "f320d8430c10f82d4fdd80567c4d533fa90c25d5",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-governance-architecture/blob/f320d8430c10f82d4fdd80567c4d533fa90c25d5/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Bounded governance only."
+          ],
+          "repository": "logos-governance-architecture"
+        },
+        {
+          "repository": "logos-governance-architecture",
+          "sha": "f320d8430c10f82d4fdd80567c4d533fa90c25d5",
+          "canonical_path": "docs/governance/engineering-practice-library/simple-before-swarm.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-governance-architecture/blob/f320d8430c10f82d4fdd80567c4d533fa90c25d5/docs/governance/engineering-practice-library/simple-before-swarm.md",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No continuous autonomous product swarm."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "logos-scripture-graph",
+      "canonical_url": "https://github.com/lowelltwong-alt/logos-scripture-graph",
+      "visibility": "public",
+      "delivery": "implementation",
+      "maturity": "public_substrate",
+      "validation_state": "source_described",
+      "priority": {
+        "value": "featured",
+        "reason": "Public deterministic Scripture data-plane substrate."
+      },
+      "capability_tags": [
+        "scripture_graph",
+        "provenance",
+        "deterministic_validation"
+      ],
+      "claim_ids": [
+        "repo.scripture_graph.scope"
+      ],
+      "pinned_public_sha": "c6982050a0a8f1b9508e1d2c5b767513bc92d2fa",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "c6982050a0a8f1b9508e1d2c5b767513bc92d2fa",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-scripture-graph/blob/c6982050a0a8f1b9508e1d2c5b767513bc92d2fa/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Not an agent runtime."
+          ],
+          "repository": "logos-scripture-graph"
+        },
+        {
+          "sha": "c6982050a0a8f1b9508e1d2c5b767513bc92d2fa",
+          "canonical_path": "scripts/validate_scripture_first_biblical_chunking_family.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-scripture-graph/blob/c6982050a0a8f1b9508e1d2c5b767513bc92d2fa/scripts/validate_scripture_first_biblical_chunking_family.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Validation source only."
+          ],
+          "repository": "logos-scripture-graph"
+        },
+        {
+          "repository": "logos-scripture-graph",
+          "sha": "c6982050a0a8f1b9508e1d2c5b767513bc92d2fa",
+          "canonical_path": "schemas/graph_edge_record.schema.json",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-scripture-graph/blob/c6982050a0a8f1b9508e1d2c5b767513bc92d2fa/schemas/graph_edge_record.schema.json",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "logos-scripture-graph",
+          "sha": "c6982050a0a8f1b9508e1d2c5b767513bc92d2fa",
+          "canonical_path": "config/agents/families/scripture-first-biblical-chunking/family.v1.yaml",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-scripture-graph/blob/c6982050a0a8f1b9508e1d2c5b767513bc92d2fa/config/agents/families/scripture-first-biblical-chunking/family.v1.yaml",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "logos-scripture-graph",
+          "sha": "c6982050a0a8f1b9508e1d2c5b767513bc92d2fa",
+          "canonical_path": "tests/test_scripture_first_biblical_chunking_family.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-scripture-graph/blob/c6982050a0a8f1b9508e1d2c5b767513bc92d2fa/tests/test_scripture_first_biblical_chunking_family.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No runtime claim."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "lowelltwong-alt",
+      "canonical_url": "https://github.com/lowelltwong-alt/lowelltwong-alt",
+      "visibility": "public",
+      "delivery": "public_proof",
+      "maturity": "profile_router",
+      "validation_state": "source_described",
+      "priority": {
+        "value": "featured",
+        "reason": "Human and AI routing surface."
+      },
+      "capability_tags": [
+        "portfolio_routing",
+        "human_ai_navigation"
+      ],
+      "claim_ids": [
+        "repo.profile.scope"
+      ],
+      "pinned_public_sha": "1fac4c35adc9425177e2733b951736d001ff4de8",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "1fac4c35adc9425177e2733b951736d001ff4de8",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/lowelltwong-alt/blob/1fac4c35adc9425177e2733b951736d001ff4de8/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Target repos remain canonical."
+          ],
+          "repository": "lowelltwong-alt"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Router only."
+      ],
+      "pin_policy": "self_referential_ancestor"
+    },
+    {
+      "name": "noesis-atlas",
+      "canonical_url": "https://github.com/lowelltwong-alt/noesis-atlas",
+      "visibility": "public",
+      "delivery": "prototype",
+      "maturity": "skeletal",
+      "validation_state": "not_asserted",
+      "priority": {
+        "value": "supporting",
+        "reason": "Skeletal controlled-use taxonomy control plane."
+      },
+      "capability_tags": [
+        "worldview_taxonomy",
+        "authority_profiles"
+      ],
+      "claim_ids": [
+        "repo.noesis.scope"
+      ],
+      "pinned_public_sha": "8fb557b4b22985d75cb08d458f6723176f3d116f",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "8fb557b4b22985d75cb08d458f6723176f3d116f",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/noesis-atlas/blob/8fb557b4b22985d75cb08d458f6723176f3d116f/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Skeletal prototype."
+          ],
+          "repository": "noesis-atlas"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No deployment claim."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "orphan-radar",
+      "canonical_url": "https://github.com/lowelltwong-alt/orphan-radar",
+      "visibility": "public",
+      "delivery": "public_proof",
+      "maturity": "public_implementation",
+      "validation_state": "source_described",
+      "priority": {
+        "value": "featured",
+        "reason": "Public local-first knowledge-maintenance tool."
+      },
+      "capability_tags": [
+        "local_first",
+        "knowledge_graph",
+        "bounded_stochastic_calibration"
+      ],
+      "claim_ids": [
+        "repo.orphan.scope"
+      ],
+      "pinned_public_sha": "9d2e0a271f82e141db65124a20534738db7be1e7",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "9d2e0a271f82e141db65124a20534738db7be1e7",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/orphan-radar/blob/9d2e0a271f82e141db65124a20534738db7be1e7/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "No LLM evaluation."
+          ],
+          "repository": "orphan-radar"
+        },
+        {
+          "sha": "9d2e0a271f82e141db65124a20534738db7be1e7",
+          "canonical_path": "pyproject.toml",
+          "canonical_url": "https://github.com/lowelltwong-alt/orphan-radar/blob/9d2e0a271f82e141db65124a20534738db7be1e7/pyproject.toml",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "No LLM dependency claim."
+          ],
+          "repository": "orphan-radar"
+        },
+        {
+          "repository": "orphan-radar",
+          "sha": "9d2e0a271f82e141db65124a20534738db7be1e7",
+          "canonical_path": "src/orphan_radar/graph/build_graph.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/orphan-radar/blob/9d2e0a271f82e141db65124a20534738db7be1e7/src/orphan_radar/graph/build_graph.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "orphan-radar",
+          "sha": "9d2e0a271f82e141db65124a20534738db7be1e7",
+          "canonical_path": "src/orphan_radar/core/pipeline.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/orphan-radar/blob/9d2e0a271f82e141db65124a20534738db7be1e7/src/orphan_radar/core/pipeline.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "orphan-radar",
+          "sha": "9d2e0a271f82e141db65124a20534738db7be1e7",
+          "canonical_path": "src/orphan_radar/eval/link_reconstruction.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/orphan-radar/blob/9d2e0a271f82e141db65124a20534738db7be1e7/src/orphan_radar/eval/link_reconstruction.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        },
+        {
+          "repository": "orphan-radar",
+          "sha": "9d2e0a271f82e141db65124a20534738db7be1e7",
+          "canonical_path": "tests/test_pipeline.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/orphan-radar/blob/9d2e0a271f82e141db65124a20534738db7be1e7/tests/test_pipeline.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path only; no run-result claim."
+          ]
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Bounded classical ranking only."
+      ],
+      "pin_policy": "exact_default_head"
     }
   ],
-  "update_rules": {
-    "keep_readme_human_clean": true,
-    "housekeeping_file": "ai/AI_UPDATE_INSTRUCTIONS.md",
-    "agent_file": "AGENTS.md",
-    "airca_not_flagship": true,
-    "lawfirm_os_authority_route": "LawFirm-os-semantic-substrate",
-    "logos_authority_route": "logos-fractal-theological-architecture",
-    "noesis_status": "profile_level_router_unless_public_repo_is_created"
-  },
-  "claim_discipline": {
-    "confirmed": "directly supported by current repo files or public repo metadata",
-    "inferred": "logically derived but not directly stated",
-    "assumed": "working assumption",
-    "unknown": "not available from current public evidence"
-  }
+  "private_routes": [
+    {
+      "name": "Digital Asset Directory",
+      "canonical_url": "https://github.com/lowelltwong-alt/Digital-Assett-Directory",
+      "visibility": "private_owner_approved_reference",
+      "delivery": "private_on_request",
+      "maturity": "runtime_unasserted",
+      "validation_state": "owner_approved_description_only",
+      "priority": {
+        "value": "supporting",
+        "reason": "Sole private owner-approved reference."
+      },
+      "capability_tags": [
+        "asset_graph",
+        "mcp_server",
+        "headless_ai_operations",
+        "agent_mesh"
+      ],
+      "claim_ids": [
+        "private.dad.scope"
+      ],
+      "pinned_public_sha": "not_public",
+      "observed_at": "2026-08-27T20:03:00Z",
+      "evidence_routes": [
+        {
+          "sha": "not_public",
+          "canonical_path": "src/digital_asset_directory/mcp_server.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/Digital-Assett-Directory",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "owner_approved_private_reference",
+          "access_level": "after_authorized_access",
+          "source_owned": false,
+          "generated": false,
+          "non_claims": [
+            "No anonymous public proof.",
+            "Runtime and deployment unasserted."
+          ],
+          "repository": "Digital Asset Directory"
+        },
+        {
+          "repository": "Digital Asset Directory",
+          "sha": "not_public",
+          "canonical_path": "not_public",
+          "canonical_url": "https://github.com/lowelltwong-alt/Digital-Assett-Directory",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "owner_approved_private_reference",
+          "access_level": "after_authorized_access",
+          "source_owned": false,
+          "generated": false,
+          "non_claims": [
+            "No anonymous public proof.",
+            "Runtime and deployment unasserted."
+          ]
+        }
+      ],
+      "access": "after_authorized_access",
+      "non_claims": [
+        "Read-only by default.",
+        "Narrow receipt recording only.",
+        "No execution authority.",
+        "Runtime and deployment unasserted."
+      ],
+      "pin_policy": "owner_approved_reference"
+    }
+  ],
+  "claims": [
+    {
+      "id": "repo.airca.scope",
+      "statement": "Supporting decision architecture public prototype.",
+      "source_repositories": [
+        "airca-fractal-decision-architecture"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "ef0947ea93b22382fc76379acc1beee3b9126e38",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/airca-fractal-decision-architecture/blob/ef0947ea93b22382fc76379acc1beee3b9126e38/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Supporting context only."
+          ],
+          "repository": "airca-fractal-decision-architecture"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Not flagship."
+      ]
+    },
+    {
+      "id": "repo.claude_audit.scope",
+      "statement": "Deprioritized public audit-harness prototype with candidate-only maturity.",
+      "source_repositories": [
+        "claude-legal-audit-lab"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "f1ade27283eeac7c5fd49dd75d6747d2c21a0d17",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/claude-legal-audit-lab/blob/f1ade27283eeac7c5fd49dd75d6747d2c21a0d17/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Candidate-only public evidence."
+          ],
+          "repository": "claude-legal-audit-lab"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No release result claim."
+      ]
+    },
+    {
+      "id": "repo.lairca.scope",
+      "statement": "Archived public attribution context.",
+      "source_repositories": [
+        "lairca-logos-grounded-theological-model"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "84bb0478c84b04df838114fc50703baa7d3f3f7a",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/lairca-logos-grounded-theological-model/blob/84bb0478c84b04df838114fc50703baa7d3f3f7a/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Archived context only."
+          ],
+          "repository": "lairca-logos-grounded-theological-model"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Not current authority."
+      ]
+    },
+    {
+      "id": "repo.digital_twin.scope",
+      "statement": "Synthetic simulation prototype.",
+      "source_repositories": [
+        "law-firm-digital-twin"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "0f2d97b405e156ce1086aea157c02d09dac32bca",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/law-firm-digital-twin/blob/0f2d97b405e156ce1086aea157c02d09dac32bca/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Synthetic candidate only."
+          ],
+          "repository": "law-firm-digital-twin"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No deployment claim."
+      ]
+    },
+    {
+      "id": "repo.exceptions.scope",
+      "statement": "Evidence-plane public MVP.",
+      "source_repositories": [
+        "LawFirm-os-exceptions-lake-runtime"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "bf5e29411d119d3ca4041b31f24a978f3715aae7",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-exceptions-lake-runtime/blob/bf5e29411d119d3ca4041b31f24a978f3715aae7/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Non-production MVP."
+          ],
+          "repository": "LawFirm-os-exceptions-lake-runtime"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No production claim."
+      ]
+    },
+    {
+      "id": "repo.intake.scope",
+      "statement": "Synthetic human-reviewable public reference workflow.",
+      "source_repositories": [
+        "LawFirm-os-intake"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "2d357bbd1432ba36ac621f895bb47df0ad7a2a90",
+          "canonical_path": "AI_FRONT_DOOR.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-intake/blob/2d357bbd1432ba36ac621f895bb47df0ad7a2a90/AI_FRONT_DOOR.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Synthetic/public-source evidence only."
+          ],
+          "repository": "LawFirm-os-intake"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No real-client data validation."
+      ]
+    },
+    {
+      "id": "repo.legal_knowledge.scope",
+      "statement": "Local-first synthetic-first legal context assembly MVP.",
+      "source_repositories": [
+        "LawFirm-os-legal-knowledge-runtime"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "7b2714080c33c0af2bd4ed9b6d8381deb2d35814",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-legal-knowledge-runtime/blob/7b2714080c33c0af2bd4ed9b6d8381deb2d35814/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Synthetic-first MVP."
+          ],
+          "repository": "LawFirm-os-legal-knowledge-runtime"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Synthetic-first."
+      ]
+    },
+    {
+      "id": "repo.orchestrator.scope",
+      "statement": "Contract-governed execution plane.",
+      "source_repositories": [
+        "LawFirm-os-orchestrator"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "5bf9ec7ffa71de702cca9cc6c764003713c17f15",
+          "canonical_path": "AI_FRONT_DOOR.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-orchestrator/blob/5bf9ec7ffa71de702cca9cc6c764003713c17f15/AI_FRONT_DOOR.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "No autonomous runtime claim."
+          ],
+          "repository": "LawFirm-os-orchestrator"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No semantic-canon ownership."
+      ]
+    },
+    {
+      "id": "repo.substrate.scope",
+      "statement": "LawFirm OS semantic contract authority.",
+      "source_repositories": [
+        "LawFirm-os-semantic-substrate"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "54bdb2ac5261d5626e3fa946a2c18ff2b677ea08",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate/blob/54bdb2ac5261d5626e3fa946a2c18ff2b677ea08/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Not a production runtime."
+          ],
+          "repository": "LawFirm-os-semantic-substrate"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Contract authority only."
+      ]
+    },
+    {
+      "id": "repo.skills.scope",
+      "statement": "Local-first skill supply-chain controls.",
+      "source_repositories": [
+        "LawFirm-os-skills-registry"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "1fe195ef39af0064e1066cae8890c8a944d06949",
+          "canonical_path": "src/lawfirm_os_skills_registry/qa/freshness_validator.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/LawFirm-os-skills-registry/blob/1fe195ef39af0064e1066cae8890c8a944d06949/src/lawfirm_os_skills_registry/qa/freshness_validator.py",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Source path, not test-result evidence."
+          ],
+          "repository": "LawFirm-os-skills-registry"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No autonomy claim."
+      ]
+    },
+    {
+      "id": "repo.boundary.scope",
+      "statement": "Boundary-literature scaffold.",
+      "source_repositories": [
+        "logos-boundary-literature"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "9defaa58fa34a1ce9f0791ccdc2b4e28e99e4046",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-boundary-literature/blob/9defaa58fa34a1ce9f0791ccdc2b4e28e99e4046/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "No source texts."
+          ],
+          "repository": "logos-boundary-literature"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Scaffold only."
+      ]
+    },
+    {
+      "id": "repo.doctrine.scope",
+      "statement": "Data-free doctrine-lineage scaffold.",
+      "source_repositories": [
+        "logos-doctrine-genealogy"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "add1aad9816e9b3d9a0977b9e73578c530aaf332",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-doctrine-genealogy/blob/add1aad9816e9b3d9a0977b9e73578c530aaf332/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Data-free scaffold."
+          ],
+          "repository": "logos-doctrine-genealogy"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Scaffold only."
+      ]
+    },
+    {
+      "id": "repo.logos_governance.scope",
+      "statement": "Bounded public theological governance architecture.",
+      "source_repositories": [
+        "logos-governance-architecture"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "f320d8430c10f82d4fdd80567c4d533fa90c25d5",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-governance-architecture/blob/f320d8430c10f82d4fdd80567c4d533fa90c25d5/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Bounded governance only."
+          ],
+          "repository": "logos-governance-architecture"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No continuous autonomous swarm."
+      ]
+    },
+    {
+      "id": "repo.scripture_graph.scope",
+      "statement": "Deterministic governed Scripture graph substrate.",
+      "source_repositories": [
+        "logos-scripture-graph"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "c6982050a0a8f1b9508e1d2c5b767513bc92d2fa",
+          "canonical_path": "scripts/validate_scripture_first_biblical_chunking_family.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-scripture-graph/blob/c6982050a0a8f1b9508e1d2c5b767513bc92d2fa/scripts/validate_scripture_first_biblical_chunking_family.py",
+          "observation_time": "2026-08-27T20:26:19Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Validation source only."
+          ],
+          "repository": "logos-scripture-graph"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No agent runtime claim."
+      ]
+    },
+    {
+      "id": "repo.profile.scope",
+      "statement": "Human profile and AI router.",
+      "source_repositories": [
+        "lowelltwong-alt"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "1fac4c35adc9425177e2733b951736d001ff4de8",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/lowelltwong-alt/blob/1fac4c35adc9425177e2733b951736d001ff4de8/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Target repos remain canonical."
+          ],
+          "repository": "lowelltwong-alt"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Target repos remain canonical."
+      ]
+    },
+    {
+      "id": "repo.noesis.scope",
+      "statement": "Skeletal worldview taxonomy control-plane prototype.",
+      "source_repositories": [
+        "noesis-atlas"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "8fb557b4b22985d75cb08d458f6723176f3d116f",
+          "canonical_path": "README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/noesis-atlas/blob/8fb557b4b22985d75cb08d458f6723176f3d116f/README.md",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Skeletal prototype."
+          ],
+          "repository": "noesis-atlas"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "No deployment claim."
+      ]
+    },
+    {
+      "id": "repo.orphan.scope",
+      "statement": "Bounded classical orphan-candidate ranking.",
+      "source_repositories": [
+        "orphan-radar"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "9d2e0a271f82e141db65124a20534738db7be1e7",
+          "canonical_path": "pyproject.toml",
+          "canonical_url": "https://github.com/lowelltwong-alt/orphan-radar/blob/9d2e0a271f82e141db65124a20534738db7be1e7/pyproject.toml",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "No LLM dependency claim."
+          ],
+          "repository": "orphan-radar"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Classical bounded ranking only."
+      ]
+    },
+    {
+      "id": "private.dad.scope",
+      "statement": "Owner-approved private local-first governed asset graph reference.",
+      "source_repositories": [
+        "Digital Asset Directory"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "not_public",
+          "canonical_path": "src/digital_asset_directory/mcp_server.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/Digital-Assett-Directory",
+          "observation_time": "2026-08-27T20:03:00Z",
+          "evidence_class": "owner_approved_private_reference",
+          "access_level": "after_authorized_access",
+          "source_owned": false,
+          "generated": false,
+          "non_claims": [
+            "No anonymous public proof.",
+            "Runtime and deployment unasserted."
+          ],
+          "repository": "Digital Asset Directory"
+        }
+      ],
+      "access": "after_authorized_access",
+      "non_claims": [
+        "Runtime and deployment unasserted."
+      ]
+    }
+  ]
 }
