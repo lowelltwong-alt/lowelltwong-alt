@@ -1,0 +1,184 @@
+{
+  "$schema": "../schemas/release-receipt.schema.json",
+  "schema_version": "2.0.0",
+  "receipt_id": "profile-release-closure-20260827",
+  "status": "final_closure_public_safe",
+  "observed_at": "2026-08-27T21:55:01Z",
+  "public_inventory_count": 17,
+  "evidence_class": "generated_secondary",
+  "public_safety": "public_safe_closure",
+  "release_authorized": false,
+  "non_claims": [
+    "This receipt is generated secondary evidence and does not replace source-owned proof.",
+    "It does not authorize release, production deployment, autonomous operation, or access to private material."
+  ],
+  "content_pr": {
+    "url": "https://github.com/lowelltwong-alt/lowelltwong-alt/pull/3",
+    "number": 3,
+    "merged_sha": "df9df61f1e3152adbcb8127615a57b0f4df08bdb",
+    "merged_at": "2026-08-27T21:03:42Z",
+    "method": "squash"
+  },
+  "source_shas": [
+    {
+      "repo": "LawFirm-os-intake",
+      "sha": "2d357bbd1432ba36ac621f895bb47df0ad7a2a90",
+      "observed_at": "2026-08-27T21:55:01Z",
+      "access": "anonymous_public"
+    },
+    {
+      "repo": "LawFirm-os-orchestrator",
+      "sha": "5bf9ec7ffa71de702cca9cc6c764003713c17f15",
+      "observed_at": "2026-08-27T21:55:01Z",
+      "access": "anonymous_public"
+    },
+    {
+      "repo": "LawFirm-os-semantic-substrate",
+      "sha": "54bdb2ac5261d5626e3fa946a2c18ff2b677ea08",
+      "observed_at": "2026-08-27T21:55:01Z",
+      "access": "anonymous_public"
+    },
+    {
+      "repo": "LawFirm-os-skills-registry",
+      "sha": "1fe195ef39af0064e1066cae8890c8a944d06949",
+      "observed_at": "2026-08-27T21:55:01Z",
+      "access": "anonymous_public"
+    },
+    {
+      "repo": "logos-governance-architecture",
+      "sha": "f320d8430c10f82d4fdd80567c4d533fa90c25d5",
+      "observed_at": "2026-08-27T21:55:01Z",
+      "access": "anonymous_public"
+    },
+    {
+      "repo": "logos-scripture-graph",
+      "sha": "c6982050a0a8f1b9508e1d2c5b767513bc92d2fa",
+      "observed_at": "2026-08-27T21:55:01Z",
+      "access": "anonymous_public"
+    },
+    {
+      "repo": "orphan-radar",
+      "sha": "9d2e0a271f82e141db65124a20534738db7be1e7",
+      "observed_at": "2026-08-27T21:55:01Z",
+      "access": "anonymous_public"
+    }
+  ],
+  "public_checks": [
+    {
+      "name": "profile-package-schema-and-synchronization",
+      "status": "pass",
+      "observed_at": "2026-08-27T21:55:01Z",
+      "public_url": "https://github.com/lowelltwong-alt/lowelltwong-alt/blob/df9df61f1e3152adbcb8127615a57b0f4df08bdb/scripts/validate_profile_package.py",
+      "non_claims": [
+        "The public URL identifies the deterministic validator implementation, not a hosted CI attestation."
+      ]
+    },
+    {
+      "name": "anonymous-inventory-default-head-and-evidence-route-resolution",
+      "status": "pass",
+      "observed_at": "2026-08-27T21:55:01Z",
+      "public_url": "https://github.com/lowelltwong-alt/lowelltwong-alt/blob/df9df61f1e3152adbcb8127615a57b0f4df08bdb/scripts/validate_profile_package.py",
+      "non_claims": [
+        "This is a point-in-time observation and does not claim continuous monitoring."
+      ]
+    },
+    {
+      "name": "content-pr-hosted-ci",
+      "status": "not_applicable",
+      "observed_at": "2026-08-27T21:55:01Z",
+      "public_url": "not_applicable",
+      "non_claims": [
+        "No hosted CI checks or branch-protection checks were configured for the content pull request."
+      ]
+    },
+    {
+      "name": "content-pr-independent-exact-head-gate",
+      "status": "pass",
+      "observed_at": "2026-08-27T21:55:01Z",
+      "public_url": "https://github.com/lowelltwong-alt/lowelltwong-alt/pull/3",
+      "non_claims": [
+        "The public pull request identifies the reviewed change; the gate result is generated secondary evidence."
+      ]
+    }
+  ],
+  "inventory_observation": {
+    "source_url": "https://api.github.com/users/lowelltwong-alt/repos?per_page=100&type=public",
+    "observed_at": "2026-08-27T21:55:01Z",
+    "count": 17,
+    "access": "anonymous_public"
+  },
+  "privacy_result": {
+    "status": "pass",
+    "observed_at": "2026-08-27T21:55:01Z",
+    "sole_private_disclosure": "Digital Asset Directory",
+    "non_claims": [
+      "No private path, branch, source record, test detail, or non-approved private repository disclosure is included.",
+      "The approved private system is an access-controlled reference, not anonymous public proof."
+    ]
+  },
+  "lane_dispositions": [
+    {
+      "public_lane_label": "Profile content",
+      "status": "integrated",
+      "public_sha": "df9df61f1e3152adbcb8127615a57b0f4df08bdb",
+      "reason": "The reviewed profile routing package was merged through pull request 3.",
+      "non_claims": [
+        "Integration does not certify production deployment."
+      ]
+    },
+    {
+      "public_lane_label": "Orphan Radar maintenance",
+      "status": "integrated",
+      "public_sha": "9d2e0a271f82e141db65124a20534738db7be1e7",
+      "reason": "The independently gated public maintenance change is present on the default branch.",
+      "non_claims": [
+        "The public SHA is not evidence of an autonomous runtime."
+      ]
+    },
+    {
+      "public_lane_label": "Intake follow-up",
+      "status": "unpublished",
+      "public_sha": "not_published",
+      "reason": "The release gate did not authorize the follow-up candidate for publication.",
+      "non_claims": [
+        "Only the pinned public source is used for portfolio claims."
+      ]
+    },
+    {
+      "public_lane_label": "Logos Scripture Graph maintenance",
+      "status": "blocked",
+      "public_sha": "not_published",
+      "reason": "The public maintenance pull request remains unmerged pending review resolution.",
+      "non_claims": [
+        "Unmerged changes are excluded from portfolio evidence."
+      ]
+    },
+    {
+      "public_lane_label": "Semantic Substrate maintenance",
+      "status": "blocked",
+      "public_sha": "not_published",
+      "reason": "The public maintenance pull request remains unmerged pending review resolution.",
+      "non_claims": [
+        "Unmerged changes are excluded from portfolio evidence."
+      ]
+    },
+    {
+      "public_lane_label": "Orchestrator follow-up",
+      "status": "held",
+      "public_sha": "not_published",
+      "reason": "A separate governed release lane is required before publication.",
+      "non_claims": [
+        "Only the pinned public source is used for portfolio claims."
+      ]
+    },
+    {
+      "public_lane_label": "Exceptions Lake follow-up",
+      "status": "held",
+      "public_sha": "not_published",
+      "reason": "A separate governed release lane is required before publication.",
+      "non_claims": [
+        "Only the pinned public source is used for portfolio claims."
+      ]
+    }
+  ]
+}
