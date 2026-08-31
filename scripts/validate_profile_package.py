@@ -46,7 +46,13 @@ GITHUB_URL_PATTERN = re.compile(
     r"(?i)(?:https?:)?//(?:www\.)?github\.com\.?(?::[0-9]+)?/[^\s<>\[\]()\"'`]+"
 )
 MARKDOWN_BACKSLASH_ESCAPE = re.compile(r"\\([!\"#$%&'()*+,\-./:;<=>?@\[\]^_`{|}~])")
-SERIALIZED_UNICODE_ESCAPE = re.compile(r"\\u([0-9A-Fa-f]{4})")
+SERIALIZED_CODEPOINT_ESCAPES = (
+    re.compile(r"\\x([0-9A-Fa-f]{2})"),
+    re.compile(r"\\u([0-9A-Fa-f]{4})"),
+    re.compile(r"\\U([0-9A-Fa-f]{8})"),
+)
+SERIALIZED_NUMERIC_ESCAPE_PREFIX = re.compile(r"\\+(?=[xuU][0-9A-Fa-f])")
+YAML_ESCAPED_LINE_BREAK = re.compile(r"\\(?:\r\n?|\n)[ \t]*")
 
 
 def read_json(path: Path) -> dict:
@@ -66,7 +72,17 @@ def normalize_release_text(text: str) -> str:
     previous = None
     while text != previous:
         previous = text
-        text = SERIALIZED_UNICODE_ESCAPE.sub(lambda match: chr(int(match.group(1), 16)), text)
+        text = YAML_ESCAPED_LINE_BREAK.sub("", text)
+        text = SERIALIZED_NUMERIC_ESCAPE_PREFIX.sub(lambda _: "\\", text)
+        for pattern in SERIALIZED_CODEPOINT_ESCAPES:
+            text = pattern.sub(
+                lambda match: (
+                    chr(int(match.group(1), 16))
+                    if int(match.group(1), 16) <= sys.maxunicode
+                    else match.group(0)
+                ),
+                text,
+            )
         text = unescape(text)
         text = MARKDOWN_BACKSLASH_ESCAPE.sub(r"\1", text)
     return text
@@ -197,6 +213,37 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         f"\\u{ord(character):04X}" for character in f"{narrative_only_root}/tree/secret"
     )
     nested_unicode_deep_url = unicode_encoded_deep_url.replace(r"\u002f", r"\u005cu002f")
+    yaml_hex_encoded_deep_url = "".join(
+        f"\\x{ord(character):02x}" for character in f"{narrative_only_root}/tree/secret"
+    )
+    mixed_case_yaml_hex_deep_url = "".join(
+        f"\\x{ord(character):02X}" for character in f"{narrative_only_root}/tree/secret"
+    )
+    nested_yaml_hex_deep_url = yaml_hex_encoded_deep_url.replace(r"\x2f", r"\x5cx2f")
+    yaml_long_unicode_deep_url = "".join(
+        f"\\U{ord(character):08x}" for character in f"{narrative_only_root}/tree/secret"
+    )
+    mixed_yaml_numeric_deep_url = "".join(
+        (
+            f"\\x{ord(character):02x}"
+            if index % 3 == 0
+            else f"\\u{ord(character):04x}"
+            if index % 3 == 1
+            else f"\\U{ord(character):08x}"
+        )
+        for index, character in enumerate(f"{narrative_only_root}/tree/secret")
+    )
+    cross_family_nested_deep_url = yaml_hex_encoded_deep_url.replace(
+        r"\x2f",
+        r"\u005cx2f",
+    )
+    escaped_numeric_prefix_deep_url = yaml_hex_encoded_deep_url.replace(r"\x", r"\\x")
+    line_split = f"{narrative_only_root}/tree/secret".index("github.com") + 3
+    yaml_line_continued_deep_url = (
+        f"{narrative_only_root}/tree/secret"[:line_split]
+        + "\\\n    "
+        + f"{narrative_only_root}/tree/secret"[line_split:]
+    )
     cases = (
         (Path("README.md"), narrative_only_root, True, "narrative-only Markdown disclosure"),
         (Path("registry/example.json"), narrative_only_root, False, "narrative-only structured disclosure"),
@@ -212,6 +259,14 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         (Path("README.md"), unicode_encoded_deep_url, False, "narrative-only serialized Unicode form"),
         (Path("README.md"), mixed_case_unicode_deep_url, False, "narrative-only mixed-case Unicode form"),
         (Path("README.md"), nested_unicode_deep_url, False, "narrative-only nested Unicode form"),
+        (Path("README.md"), yaml_hex_encoded_deep_url, False, "narrative-only YAML hex form"),
+        (Path("README.md"), mixed_case_yaml_hex_deep_url, False, "narrative-only mixed-case YAML hex form"),
+        (Path("README.md"), nested_yaml_hex_deep_url, False, "narrative-only nested YAML hex form"),
+        (Path("README.md"), yaml_long_unicode_deep_url, False, "narrative-only YAML long Unicode form"),
+        (Path("README.md"), mixed_yaml_numeric_deep_url, False, "narrative-only mixed YAML numeric form"),
+        (Path("README.md"), cross_family_nested_deep_url, False, "narrative-only cross-family nested form"),
+        (Path("README.md"), escaped_numeric_prefix_deep_url, False, "narrative-only escaped numeric prefix form"),
+        (Path("README.md"), yaml_line_continued_deep_url, False, "narrative-only YAML line continuation form"),
         (Path("README.md"), narrative_only_root.replace("https://github.com", "https://www.github.com") + "/tree/secret", False, "narrative-only www host alias"),
         (Path("README.md"), narrative_only_root.replace("github.com", "github.com.:443") + "/tree/secret", False, "narrative-only host authority variant"),
         (Path("README.md"), narrative_only_root.removeprefix("https:") + "/tree/secret", False, "narrative-only protocol-relative form"),
@@ -235,6 +290,11 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     encoded_identifier = "".join(f"\\u{ord(character):04x}" for character in repository_name)
     if not has_noncanonical_narrative_identifier(encoded_identifier, narrative_only_root):
         fail(errors, "serialized narrative-only identifier regression")
+    yaml_encoded_identifier = "".join(f"\\x{ord(character):02x}" for character in repository_name)
+    if not has_noncanonical_narrative_identifier(yaml_encoded_identifier, narrative_only_root):
+        fail(errors, "YAML-serialized narrative-only identifier regression")
+    if normalize_release_text(r"\U00110000") != r"\U00110000":
+        fail(errors, "out-of-range serialized Unicode regression")
 
 
 def validate_schema_documents(errors: list[str]) -> tuple[dict, dict, dict, list[dict]]:
