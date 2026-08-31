@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from html import unescape
@@ -65,6 +66,43 @@ def fail(errors: list[str], message: str) -> None:
 
 def route_key(route: dict) -> tuple[str, str, str]:
     return (route["sha"], route["canonical_path"], route["canonical_url"])
+
+
+def tracked_utf8_text_files(errors: list[str]) -> list[tuple[Path, str]]:
+    """Load every Git-tracked file as UTF-8 text or fail closed for explicit handling."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(ROOT), "ls-files", "-z", "--cached"],
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        fail(errors, f"tracked-file inventory unavailable: {error}")
+        return []
+
+    tracked: list[tuple[Path, str]] = []
+    for raw_path in result.stdout.split(b"\0"):
+        if not raw_path:
+            continue
+        try:
+            relative = Path(raw_path.decode("utf-8"))
+        except UnicodeDecodeError:
+            fail(errors, "tracked-file inventory contains a non-UTF-8 path")
+            continue
+        if relative.is_absolute() or ".." in relative.parts:
+            fail(errors, f"tracked-file inventory escaped the repository root: {relative}")
+            continue
+        path = ROOT / relative
+        if path.is_symlink() or not path.is_file():
+            fail(errors, f"tracked file requires explicit non-regular-file handling: {relative}")
+            continue
+        try:
+            text = path.read_text(encoding="utf-8-sig")
+        except UnicodeDecodeError:
+            fail(errors, f"tracked file is not UTF-8 text and requires explicit handling: {relative}")
+            continue
+        tracked.append((path, text))
+    return tracked
 
 
 def normalize_release_text(text: str, *, markdown_escapes: bool = True) -> str:
@@ -307,6 +345,10 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     cases = (
         (Path("README.md"), narrative_only_root, True, "narrative-only Markdown disclosure"),
         (Path("registry/example.json"), narrative_only_root, False, "narrative-only structured disclosure"),
+        (Path("example.txt"), narrative_only_root, False, "narrative-only text disclosure"),
+        (Path("example.toml"), narrative_only_root, False, "narrative-only TOML disclosure"),
+        (Path("example.html"), narrative_only_root, False, "narrative-only HTML disclosure"),
+        (Path("example.rst"), narrative_only_root, False, "narrative-only reStructuredText disclosure"),
         (Path("README.md"), f"{narrative_only_root}/tree/secret-review-branch", False, "narrative-only branch suffix"),
         (Path("README.md"), f"{narrative_only_root}/blob/secret/private.md", False, "narrative-only blob suffix"),
         (Path("README.md"), f"{narrative_only_root}?ref=secret", False, "narrative-only query suffix"),
@@ -525,7 +567,7 @@ def validate_release_text(
     narrative_only_root: str | None,
     errors: list[str],
 ) -> None:
-    text_paths = [path for path in ROOT.rglob("*") if path.is_file() and path.suffix.lower() in {".md", ".json", ".py", ".yaml", ".yml"}]
+    tracked_texts = tracked_utf8_text_files(errors)
     forbidden = [re.compile(pattern) for pattern in (r"\b[A-Z]:[\\/]", r"/Users/", r"\\\\Users\\", r"\.agent-governance", r"refs/heads/", r"scratch/[A-Za-z0-9_.-]+", r"(?i:(?:api[_-]?key|secret|token)\s*[:=])")]
     bounded_terms = {"deployed": ("no ", "not ", "unasserted", "does not"), "production": ("no ", "not ", "unasserted", "non-production"), "autonomous": ("no ", "not ", "never", "bounded", "unasserted"), "headless": ("authorized", "unasserted", "private"), "swarm": ("bounded", "never", "no ", "not "), "implemented": ("only if", "source-owned"), "tested": ("source-owned", "not ", "no ")}
     public_surface_paths = [
@@ -545,25 +587,47 @@ def validate_release_text(
     )
     if narrative_only_root is not None:
         allowed_roots.add(narrative_only_root)
-    for path in text_paths:
-        text = path.read_text(encoding="utf-8")
+    private_roots = set(STRUCTURED_PRIVATE_ACCESS_URLS)
+    if narrative_only_root is not None:
+        private_roots.add(narrative_only_root)
+    private_roots_by_name = {
+        unquote(urlsplit(root).path).rstrip("/").rsplit("/", 1)[-1].casefold(): root
+        for root in private_roots
+    }
+    meta_language_paths = {Path("scripts/validate_profile_package.py")}
+    for path, text in tracked_texts:
         relative = path.relative_to(ROOT)
-        if relative == Path("scripts/validate_profile_package.py") or relative.parts[:2] == ("registry", "schemas"):
-            continue  # Validator rules and schemas are meta-language, not release claims.
+        is_meta_language = relative in meta_language_paths or relative.parts[:2] == ("registry", "schemas")
         normalized_text = normalize_release_text(text)
-        for pattern in forbidden:
-            if pattern.search(normalized_text):
-                fail(errors, f"release text privacy scan: {path.relative_to(ROOT)} matched {pattern.pattern}")
-        for url in iter_owned_github_urls(normalized_text):
-            if not release_url_allowed(relative, url, allowed_roots, narrative_only_root):
-                fail(errors, f"release text has undisclosed repository URL: {relative}")
+        urls = list(iter_owned_github_urls(text))
+        for url in urls:
+            parsed_result = owned_github_url_parts(url)
+            if parsed_result is None:
+                continue
+            _, segments, _ = parsed_result
+            private_root = private_roots_by_name.get(segments[1].casefold())
+            if private_root is not None and not release_url_allowed(
+                relative,
+                url,
+                allowed_roots,
+                narrative_only_root,
+            ):
+                fail(errors, f"tracked text violates a private repository boundary: {relative}")
         if "Digital-Assett-Directory" in normalized_text and DAD_URL not in normalized_text:
-            fail(errors, f"release text has a non-canonical DAD identifier: {path.relative_to(ROOT)}")
+            fail(errors, f"release text has a non-canonical DAD identifier: {relative}")
         if narrative_only_root is not None and has_noncanonical_narrative_identifier(
             normalized_text,
             narrative_only_root,
         ):
             fail(errors, f"release text has a non-canonical narrative-only identifier: {relative}")
+        if is_meta_language:
+            continue  # Private boundaries apply above; claim fixtures remain meta-language.
+        for pattern in forbidden:
+            if pattern.search(normalized_text):
+                fail(errors, f"release text privacy scan: {relative} matched {pattern.pattern}")
+        for url in urls:
+            if not release_url_allowed(relative, url, allowed_roots, narrative_only_root):
+                fail(errors, f"release text has undisclosed repository URL: {relative}")
         if relative in {REGISTRY_PATH.relative_to(ROOT), CAPABILITIES_PATH.relative_to(ROOT), Path("registry/portable-workflow-patterns.json")}:
             continue  # Structured DAD and swarm constraints are enforced by schema and cross-reference checks.
         for term, contexts in bounded_terms.items():
