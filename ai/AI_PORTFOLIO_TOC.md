@@ -16,6 +16,8 @@ Use this after `AI_FRONT_DOOR.md`. The canonical inventory is `registry/profile-
 | Theological governance and derivation | `logos-governance-architecture` | public proof |
 | Local knowledge graph maintenance | `orphan-radar` | public proof |
 | Worldview taxonomy control plane | `noesis-atlas` | skeletal prototype |
+| Governed asset graph, local MCP, and private headless workflow | DAD via `AI_FRONT_DOOR.md` | access controlled; permission required |
+| Synthetic case graph, deterministic replay, audit, MCP, and private headless launcher | Albert via `AI_FRONT_DOOR.md` | access controlled; release held |
 
 ## Classification and authority
 
@@ -28,4 +30,5 @@ All 17 public repositories are listed in `PUBLIC_REPO_MAP.md`, including prototy
 1. Deterministic validation: Intake, Logos Scripture Graph, Orchestrator, and Skills Registry.
 2. Bounded stochastic calibration: Orphan Radar only, for review-candidate ranking; never imply LLM probabilistic evaluation.
 3. Mesh/swarm language: bounded development or workflow governance in Logos and DAD only; never a continuously operating autonomous product swarm.
-4. DAD is the sole private disclosure and is private by request. Do not infer or name any other private work.
+4. DAD is the sole structured private evidence route in the machine registry. Albert is a separate owner-approved Markdown disclosure whose bounded review surface must be requested from Lowell and reverified after permission; its held candidate is not represented as present on the linked repository's current default branch, and it is not anonymous public proof.
+5. Do not infer or name any other private work, and do not treat access as release, deployment, execution, or authority.

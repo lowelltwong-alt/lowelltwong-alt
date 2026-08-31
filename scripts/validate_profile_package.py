@@ -36,6 +36,8 @@ EXPECTED_ALIASES = [
     "probabilistic_evaluation", "end_to_end_build", "ai_governance", "skill_supply_chain",
 ]
 DAD_URL = "https://github.com/lowelltwong-alt/Digital-Assett-Directory"
+ALBERT_URL = "https://github.com/lowelltwong-alt/Albert-Trial-Simulation-System"
+APPROVED_ACCESS_URLS = {DAD_URL, ALBERT_URL}
 
 
 def read_json(path: Path) -> dict:
@@ -48,6 +50,26 @@ def fail(errors: list[str], message: str) -> None:
 
 def route_key(route: dict) -> tuple[str, str, str]:
     return (route["sha"], route["canonical_path"], route["canonical_url"])
+
+
+def release_url_allowed(relative: Path, url: str, allowed_roots: set[str]) -> bool:
+    """Keep Albert narrative-only while DAD remains the structured private route."""
+    if url == ALBERT_URL:
+        return relative.suffix.lower() == ".md"
+    return url in allowed_roots
+
+
+def validate_access_url_policy(errors: list[str]) -> None:
+    allowed_roots = {"https://github.com/lowelltwong-alt/public-example"} | APPROVED_ACCESS_URLS
+    cases = (
+        (Path("README.md"), ALBERT_URL, True, "Albert Markdown disclosure"),
+        (Path("registry/example.json"), ALBERT_URL, False, "Albert structured disclosure"),
+        (Path("registry/example.json"), DAD_URL, True, "DAD structured private route"),
+        (Path("README.md"), "https://github.com/lowelltwong-alt/unknown-private", False, "unknown private route"),
+    )
+    for relative, url, expected, label in cases:
+        if release_url_allowed(relative, url, allowed_roots) is not expected:
+            fail(errors, f"access URL policy regression: {label}")
 
 
 def validate_schema_documents(errors: list[str]) -> tuple[dict, dict, dict, list[dict]]:
@@ -125,7 +147,7 @@ def validate_cross_references(registry: dict, capabilities: dict, receipt: dict,
         expected_pin = "self_referential_ancestor" if repo["name"] == "lowelltwong-alt" else "exact_default_head"
         fail_if(repo["pin_policy"] != expected_pin, f"{repo['name']}: invalid pin policy")
     private_routes = registry["private_routes"]
-    fail_if(len(private_routes) != 1, "DAD must remain the sole private exception")
+    fail_if(len(private_routes) != 1, "DAD must remain the sole structured private evidence route")
     dad = private_routes[0]
     fail_if(dad["canonical_url"] != DAD_URL or dad["visibility"] != "private_owner_approved_reference" or dad["access"] != "after_authorized_access", "DAD private boundary is not exact")
     fail_if(dad["pinned_public_sha"] != "not_public", "DAD must not claim anonymous public proof")
@@ -190,7 +212,7 @@ def validate_markdown_projection(registry: dict, errors: list[str]) -> None:
                 fail(errors, f"public map row diverges from registry: {repo['name']}")
     if f"{count} public repositories" not in public_map or f"All {count} public repositories" not in toc:
         fail(errors, "Markdown inventory count is out of sync with registry cardinality")
-    for marker in ("AI_FRONT_DOOR.md", DAD_URL, "Deterministic validation"):
+    for marker in ("AI_FRONT_DOOR.md", DAD_URL, ALBERT_URL, "Deterministic validation"):
         if marker not in readme:
             fail(errors, f"README missing required synchronized marker: {marker}")
 
@@ -210,7 +232,7 @@ def validate_release_text(registry: dict, errors: list[str]) -> None:
         for phrase in hidden_lane_phrases:
             if re.search(re.escape(phrase), public_text, re.I):
                 fail(errors, f"public surface hidden-lane hint '{phrase}' in {public_path.relative_to(ROOT)}")
-    allowed_roots = {repo["canonical_url"] for repo in registry["repositories"]} | {DAD_URL}
+    allowed_roots = {repo["canonical_url"] for repo in registry["repositories"]} | APPROVED_ACCESS_URLS
     for path in text_paths:
         text = path.read_text(encoding="utf-8")
         relative = path.relative_to(ROOT)
@@ -220,10 +242,12 @@ def validate_release_text(registry: dict, errors: list[str]) -> None:
             if pattern.search(text):
                 fail(errors, f"release text privacy scan: {path.relative_to(ROOT)} matched {pattern.pattern}")
         for url in re.findall(r"https://github\\.com/lowelltwong-alt/[A-Za-z0-9-]+", text):
-            if url not in allowed_roots:
+            if not release_url_allowed(relative, url, allowed_roots):
                 fail(errors, f"release text has undisclosed repository URL: {relative}")
         if "Digital-Assett-Directory" in text and DAD_URL not in text:
             fail(errors, f"release text has a non-canonical DAD identifier: {path.relative_to(ROOT)}")
+        if "Albert-Trial-Simulation-System" in text and ALBERT_URL not in text:
+            fail(errors, f"release text has a non-canonical Albert identifier: {path.relative_to(ROOT)}")
         if relative in {REGISTRY_PATH.relative_to(ROOT), CAPABILITIES_PATH.relative_to(ROOT), Path("registry/portable-workflow-patterns.json")}:
             continue  # Structured DAD and swarm constraints are enforced by schema and cross-reference checks.
         for term, contexts in bounded_terms.items():
@@ -308,6 +332,7 @@ def main() -> int:
     args = parser.parse_args()
     errors: list[str] = []
     registry, capabilities, receipt, receipts = validate_schema_documents(errors)
+    validate_access_url_policy(errors)
     validate_cross_references(registry, capabilities, receipt, receipts, errors)
     validate_markdown_projection(registry, errors)
     validate_release_text(registry, errors)

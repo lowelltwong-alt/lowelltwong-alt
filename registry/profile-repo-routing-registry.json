@@ -2,7 +2,7 @@
   "$schema": "schemas/profile-routing.schema.json",
   "schema_version": "2.0.0",
   "registry_id": "lowelltwong-alt.profile-routing.v2",
-  "observed_at": "2026-08-27T20:03:00Z",
+  "observed_at": "2026-08-31T18:55:09Z",
   "inventory_source": "https://api.github.com/users/lowelltwong-alt/repos?per_page=100&type=owner",
   "public_inventory_count": 17,
   "controlled_aliases": [
@@ -854,14 +854,14 @@
       "claim_ids": [
         "repo.logos_governance.scope"
       ],
-      "pinned_public_sha": "f320d8430c10f82d4fdd80567c4d533fa90c25d5",
-      "observed_at": "2026-08-27T20:03:00Z",
+      "pinned_public_sha": "83fb2d0c1e7187a9717808f6061137f7f533d066",
+      "observed_at": "2026-08-31T18:55:09Z",
       "evidence_routes": [
         {
-          "sha": "f320d8430c10f82d4fdd80567c4d533fa90c25d5",
+          "sha": "83fb2d0c1e7187a9717808f6061137f7f533d066",
           "canonical_path": "README.md",
-          "canonical_url": "https://github.com/lowelltwong-alt/logos-governance-architecture/blob/f320d8430c10f82d4fdd80567c4d533fa90c25d5/README.md",
-          "observation_time": "2026-08-27T20:03:00Z",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-governance-architecture/blob/83fb2d0c1e7187a9717808f6061137f7f533d066/README.md",
+          "observation_time": "2026-08-31T18:55:09Z",
           "evidence_class": "source_owned_public",
           "access_level": "anonymous_public",
           "source_owned": true,
@@ -873,10 +873,10 @@
         },
         {
           "repository": "logos-governance-architecture",
-          "sha": "f320d8430c10f82d4fdd80567c4d533fa90c25d5",
+          "sha": "83fb2d0c1e7187a9717808f6061137f7f533d066",
           "canonical_path": "docs/governance/engineering-practice-library/simple-before-swarm.md",
-          "canonical_url": "https://github.com/lowelltwong-alt/logos-governance-architecture/blob/f320d8430c10f82d4fdd80567c4d533fa90c25d5/docs/governance/engineering-practice-library/simple-before-swarm.md",
-          "observation_time": "2026-08-27T20:26:19Z",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-governance-architecture/blob/83fb2d0c1e7187a9717808f6061137f7f533d066/docs/governance/engineering-practice-library/simple-before-swarm.md",
+          "observation_time": "2026-08-31T18:55:09Z",
           "evidence_class": "source_owned_public",
           "access_level": "anonymous_public",
           "source_owned": true,
@@ -1587,10 +1587,10 @@
       ],
       "evidence_routes": [
         {
-          "sha": "f320d8430c10f82d4fdd80567c4d533fa90c25d5",
+          "sha": "83fb2d0c1e7187a9717808f6061137f7f533d066",
           "canonical_path": "README.md",
-          "canonical_url": "https://github.com/lowelltwong-alt/logos-governance-architecture/blob/f320d8430c10f82d4fdd80567c4d533fa90c25d5/README.md",
-          "observation_time": "2026-08-27T20:03:00Z",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-governance-architecture/blob/83fb2d0c1e7187a9717808f6061137f7f533d066/README.md",
+          "observation_time": "2026-08-31T18:55:09Z",
           "evidence_class": "source_owned_public",
           "access_level": "anonymous_public",
           "source_owned": true,

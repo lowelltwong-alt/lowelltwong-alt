@@ -22,4 +22,4 @@ Canonical registry projection, observed from the anonymous GitHub API on 2026-08
 | [`noesis-atlas`](https://github.com/lowelltwong-alt/noesis-atlas) | `prototype` | `skeletal` | `supporting` | Skeletal controlled-use taxonomy control plane. |
 | [`orphan-radar`](https://github.com/lowelltwong-alt/orphan-radar) | `public_proof` | `public_implementation` | `featured` | Local-first graph maintenance with bounded classical candidate ranking. |
 
-The sole private owner-approved reference is [DAD — private by request](https://github.com/lowelltwong-alt/Digital-Assett-Directory). No other private work is named or implied.
+The public inventory intentionally remains 17 repositories. Two additional owner-approved systems are described only as access-controlled review routes: [DAD](https://github.com/lowelltwong-alt/Digital-Assett-Directory) and [Albert Mock Trial](https://github.com/lowelltwong-alt/Albert-Trial-Simulation-System). They are not anonymous public proof; ask Lowell for permission and follow the evidence and non-claim instructions in `AI_FRONT_DOOR.md`. No other private work is named or implied.
