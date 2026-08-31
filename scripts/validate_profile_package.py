@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -38,13 +39,14 @@ EXPECTED_ALIASES = [
     "probabilistic_evaluation", "end_to_end_build", "ai_governance", "skill_supply_chain",
 ]
 DAD_URL = "https://github.com/lowelltwong-alt/Digital-Assett-Directory"
-ALBERT_URL = "https://github.com/lowelltwong-alt/Albert-Trial-Simulation-System"
-APPROVED_ACCESS_URLS = {DAD_URL, ALBERT_URL}
+STRUCTURED_PRIVATE_ACCESS_URLS = {DAD_URL}
+NARRATIVE_ONLY_ACCESS_URL_SHA256 = "4cf7299d0f996d643bbfda870e401a52c1f69c6881b57a729e5005dad0535f05"
 GITHUB_OWNER = "lowelltwong-alt"
 GITHUB_URL_PATTERN = re.compile(
     r"(?i)(?:https?:)?//(?:www\.)?github\.com\.?(?::[0-9]+)?/[^\s<>\[\]()\"'`]+"
 )
 MARKDOWN_BACKSLASH_ESCAPE = re.compile(r"\\([!\"#$%&'()*+,\-./:;<=>?@\[\]^_`{|}~])")
+SERIALIZED_UNICODE_ESCAPE = re.compile(r"\\u([0-9A-Fa-f]{4})")
 
 
 def read_json(path: Path) -> dict:
@@ -57,6 +59,17 @@ def fail(errors: list[str], message: str) -> None:
 
 def route_key(route: dict) -> tuple[str, str, str]:
     return (route["sha"], route["canonical_path"], route["canonical_url"])
+
+
+def normalize_release_text(text: str) -> str:
+    """Normalize renderer- and serializer-level escapes before privacy checks."""
+    previous = None
+    while text != previous:
+        previous = text
+        text = SERIALIZED_UNICODE_ESCAPE.sub(lambda match: chr(int(match.group(1), 16)), text)
+        text = unescape(text)
+        text = MARKDOWN_BACKSLASH_ESCAPE.sub(r"\1", text)
+    return text
 
 
 def owned_github_url_parts(url: str) -> tuple[SplitResult, list[str], bool] | None:
@@ -91,14 +104,43 @@ def owned_github_url_parts(url: str) -> tuple[SplitResult, list[str], bool] | No
 
 def iter_owned_github_urls(text: str):
     """Yield complete URL tokens that resolve to this GitHub account."""
-    normalized_text = MARKDOWN_BACKSLASH_ESCAPE.sub(r"\1", unescape(text))
+    normalized_text = normalize_release_text(text)
     for match in GITHUB_URL_PATTERN.finditer(normalized_text):
         url = match.group(0)
         if owned_github_url_parts(url) is not None:
             yield url
 
 
-def release_url_allowed(relative: Path, url: str, allowed_roots: set[str]) -> bool:
+def load_narrative_only_access_url(errors: list[str]) -> str | None:
+    """Resolve the exact Markdown-only access route without copying its identifier."""
+    source = (ROOT / "AI_FRONT_DOOR.md").read_text(encoding="utf-8")
+    candidates = {
+        url
+        for url in iter_owned_github_urls(source)
+        if hashlib.sha256(url.encode("utf-8")).hexdigest() == NARRATIVE_ONLY_ACCESS_URL_SHA256
+    }
+    if len(candidates) != 1:
+        fail(errors, "Markdown-only access route is missing, duplicated, or changed")
+        return None
+    url = next(iter(candidates))
+    parsed_result = owned_github_url_parts(url)
+    if parsed_result is None:
+        fail(errors, "Markdown-only access route is not a recognized GitHub URL")
+        return None
+    parsed, segments, had_dot_segment = parsed_result
+    expected_root = f"https://github.com/{GITHUB_OWNER}/{segments[1]}"
+    if had_dot_segment or len(segments) != 2 or url != expected_root or parsed.query or parsed.fragment:
+        fail(errors, "Markdown-only access route must remain one exact canonical repository root")
+        return None
+    return url
+
+
+def release_url_allowed(
+    relative: Path,
+    url: str,
+    allowed_roots: set[str],
+    narrative_only_root: str | None,
+) -> bool:
     """Allow public deep links, but require exact roots for access-controlled repos."""
     parsed_result = owned_github_url_parts(url)
     if parsed_result is None:
@@ -121,49 +163,78 @@ def release_url_allowed(relative: Path, url: str, allowed_roots: set[str]) -> bo
     canonical_root = roots_by_name.get(segments[1].casefold())
     if canonical_root is None:
         return False
-    if canonical_root in APPROVED_ACCESS_URLS:
+    if canonical_root in STRUCTURED_PRIVATE_ACCESS_URLS or canonical_root == narrative_only_root:
         if url != canonical_root:
             return False
-        if canonical_root == ALBERT_URL:
+        if canonical_root == narrative_only_root:
             return relative.suffix.lower() == ".md"
     return True
 
 
-def validate_access_url_policy(errors: list[str]) -> None:
+def has_noncanonical_narrative_identifier(text: str, narrative_only_root: str) -> bool:
+    normalized_text = normalize_release_text(text)
+    repository_name = unquote(urlsplit(narrative_only_root).path).rstrip("/").rsplit("/", 1)[-1]
+    text_without_approved_root = normalized_text.replace(narrative_only_root, "")
+    return repository_name.casefold() in text_without_approved_root.casefold()
+
+
+def validate_access_url_policy(errors: list[str], narrative_only_root: str | None) -> None:
+    if narrative_only_root is None:
+        return
     public_root = "https://github.com/lowelltwong-alt/public-example"
-    allowed_roots = {public_root} | APPROVED_ACCESS_URLS
+    allowed_roots = {public_root, narrative_only_root} | STRUCTURED_PRIVATE_ACCESS_URLS
+    repository_name = narrative_only_root.rsplit("/", 1)[-1]
+    encoded_repository_name = repository_name.replace("-", "%2D")
+    html_encoded_deep_url = (
+        narrative_only_root.replace("https://", "https:&#47;&#47;").replace("-", "&#45;")
+        + "&#47;tree&#47;secret"
+    )
+    backslash_escaped_deep_url = narrative_only_root.replace("/", r"\/") + r"\/tree\/secret"
+    unicode_encoded_deep_url = "".join(
+        f"\\u{ord(character):04x}" for character in f"{narrative_only_root}/tree/secret"
+    )
+    mixed_case_unicode_deep_url = "".join(
+        f"\\u{ord(character):04X}" for character in f"{narrative_only_root}/tree/secret"
+    )
+    nested_unicode_deep_url = unicode_encoded_deep_url.replace(r"\u002f", r"\u005cu002f")
     cases = (
-        (Path("README.md"), ALBERT_URL, True, "Albert Markdown disclosure"),
-        (Path("registry/example.json"), ALBERT_URL, False, "Albert structured disclosure"),
-        (Path("README.md"), f"{ALBERT_URL}/tree/secret-review-branch", False, "Albert branch suffix"),
-        (Path("README.md"), f"{ALBERT_URL}/blob/secret/private.md", False, "Albert blob suffix"),
-        (Path("README.md"), f"{ALBERT_URL}?ref=secret", False, "Albert query suffix"),
-        (Path("README.md"), f"{ALBERT_URL}#secret", False, "Albert fragment suffix"),
-        (Path("README.md"), f"{ALBERT_URL}%2Ftree%2Fsecret", False, "Albert encoded path suffix"),
-        (Path("README.md"), f"{ALBERT_URL}.git", False, "Albert git suffix"),
-        (Path("README.md"), "https://GITHUB.com/lowelltwong-alt/Albert%2DTrial%2DSimulation%2DSystem/tree/secret", False, "Albert encoded alternate form"),
-        (Path("README.md"), "https:&#47;&#47;github.com/lowelltwong-alt/Albert&#45;Trial&#45;Simulation&#45;System&#47;tree&#47;secret", False, "Albert HTML character-reference form"),
-        (Path("README.md"), r"https:\/\/github.com\/lowelltwong-alt\/Albert-Trial-Simulation-System\/tree\/secret", False, "Albert Markdown backslash-escaped form"),
-        (Path("README.md"), "https://www.github.com/lowelltwong-alt/Albert-Trial-Simulation-System/tree/secret", False, "Albert www host alias"),
-        (Path("README.md"), "https://github.com.:443/lowelltwong-alt/Albert-Trial-Simulation-System/tree/secret", False, "Albert host authority variant"),
-        (Path("README.md"), "//github.com/lowelltwong-alt/Albert-Trial-Simulation-System/tree/secret", False, "Albert protocol-relative form"),
-        (Path("README.md"), "http://github.com/lowelltwong-alt/Albert-Trial-Simulation-System/tree/secret", False, "Albert insecure scheme"),
-        (Path("README.md"), f"{ALBERT_URL}/", False, "Albert trailing slash"),
+        (Path("README.md"), narrative_only_root, True, "narrative-only Markdown disclosure"),
+        (Path("registry/example.json"), narrative_only_root, False, "narrative-only structured disclosure"),
+        (Path("README.md"), f"{narrative_only_root}/tree/secret-review-branch", False, "narrative-only branch suffix"),
+        (Path("README.md"), f"{narrative_only_root}/blob/secret/private.md", False, "narrative-only blob suffix"),
+        (Path("README.md"), f"{narrative_only_root}?ref=secret", False, "narrative-only query suffix"),
+        (Path("README.md"), f"{narrative_only_root}#secret", False, "narrative-only fragment suffix"),
+        (Path("README.md"), f"{narrative_only_root}%2Ftree%2Fsecret", False, "narrative-only encoded path suffix"),
+        (Path("README.md"), f"{narrative_only_root}.git", False, "narrative-only git suffix"),
+        (Path("README.md"), f"https://GITHUB.com/{GITHUB_OWNER}/{encoded_repository_name}/tree/secret", False, "narrative-only encoded alternate form"),
+        (Path("README.md"), html_encoded_deep_url, False, "narrative-only HTML character-reference form"),
+        (Path("README.md"), backslash_escaped_deep_url, False, "narrative-only Markdown backslash-escaped form"),
+        (Path("README.md"), unicode_encoded_deep_url, False, "narrative-only serialized Unicode form"),
+        (Path("README.md"), mixed_case_unicode_deep_url, False, "narrative-only mixed-case Unicode form"),
+        (Path("README.md"), nested_unicode_deep_url, False, "narrative-only nested Unicode form"),
+        (Path("README.md"), narrative_only_root.replace("https://github.com", "https://www.github.com") + "/tree/secret", False, "narrative-only www host alias"),
+        (Path("README.md"), narrative_only_root.replace("github.com", "github.com.:443") + "/tree/secret", False, "narrative-only host authority variant"),
+        (Path("README.md"), narrative_only_root.removeprefix("https:") + "/tree/secret", False, "narrative-only protocol-relative form"),
+        (Path("README.md"), narrative_only_root.replace("https://", "http://") + "/tree/secret", False, "narrative-only insecure scheme"),
+        (Path("README.md"), f"{narrative_only_root}/", False, "narrative-only trailing slash"),
         (Path("registry/example.json"), DAD_URL, True, "DAD structured private route"),
         (Path("README.md"), f"{DAD_URL}/tree/secret-review-branch", False, "DAD branch suffix"),
         (Path("README.md"), f"{public_root}/blob/abc123/README.md", True, "public repository blob path"),
         (Path("README.md"), f"{public_root}/tree/main", True, "public repository tree path"),
         (Path("README.md"), f"{public_root}-evil/tree/main", False, "repository segment boundary"),
-        (Path("README.md"), f"{public_root}/../Albert-Trial-Simulation-System/tree/secret", False, "dot-segment private route"),
+        (Path("README.md"), f"{public_root}/../{repository_name}/tree/secret", False, "dot-segment private route"),
         (Path("README.md"), "https://github.com/lowelltwong-alt/unknown-private", False, "unknown private route"),
     )
     for relative, url, expected, label in cases:
         extracted = list(iter_owned_github_urls(f"prefix {url} suffix"))
-        normalized_url = MARKDOWN_BACKSLASH_ESCAPE.sub(r"\1", unescape(url))
+        normalized_url = normalize_release_text(url)
         if extracted != [normalized_url]:
             fail(errors, f"access URL extraction regression: {label}")
-        elif release_url_allowed(relative, extracted[0], allowed_roots) is not expected:
+        elif release_url_allowed(relative, extracted[0], allowed_roots, narrative_only_root) is not expected:
             fail(errors, f"access URL policy regression: {label}")
+    encoded_identifier = "".join(f"\\u{ord(character):04x}" for character in repository_name)
+    if not has_noncanonical_narrative_identifier(encoded_identifier, narrative_only_root):
+        fail(errors, "serialized narrative-only identifier regression")
 
 
 def validate_schema_documents(errors: list[str]) -> tuple[dict, dict, dict, list[dict]]:
@@ -284,7 +355,11 @@ def validate_cross_references(registry: dict, capabilities: dict, receipt: dict,
     fail_if("LLM" not in " ".join(probability["non_claims"] + [route_note for route in probability["evidence_routes"] for route_note in route["non_claims"]]), "probabilistic_evaluation must explicitly reject LLM evaluation")
 
 
-def validate_markdown_projection(registry: dict, errors: list[str]) -> None:
+def validate_markdown_projection(
+    registry: dict,
+    narrative_only_root: str | None,
+    errors: list[str],
+) -> None:
     public_map = (ROOT / "PUBLIC_REPO_MAP.md").read_text(encoding="utf-8")
     toc = (ROOT / "ai" / "AI_PORTFOLIO_TOC.md").read_text(encoding="utf-8")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
@@ -306,12 +381,19 @@ def validate_markdown_projection(registry: dict, errors: list[str]) -> None:
                 fail(errors, f"public map row diverges from registry: {repo['name']}")
     if f"{count} public repositories" not in public_map or f"All {count} public repositories" not in toc:
         fail(errors, "Markdown inventory count is out of sync with registry cardinality")
-    for marker in ("AI_FRONT_DOOR.md", DAD_URL, ALBERT_URL, "Deterministic validation"):
+    markers = ["AI_FRONT_DOOR.md", DAD_URL, "Deterministic validation"]
+    if narrative_only_root is not None:
+        markers.append(narrative_only_root)
+    for marker in markers:
         if marker not in readme:
             fail(errors, f"README missing required synchronized marker: {marker}")
 
 
-def validate_release_text(registry: dict, errors: list[str]) -> None:
+def validate_release_text(
+    registry: dict,
+    narrative_only_root: str | None,
+    errors: list[str],
+) -> None:
     text_paths = [path for path in ROOT.rglob("*") if path.is_file() and path.suffix.lower() in {".md", ".json", ".py", ".yaml", ".yml"}]
     forbidden = [re.compile(pattern) for pattern in (r"\b[A-Z]:[\\/]", r"/Users/", r"\\\\Users\\", r"\.agent-governance", r"refs/heads/", r"scratch/[A-Za-z0-9_.-]+", r"(?i:(?:api[_-]?key|secret|token)\s*[:=])")]
     bounded_terms = {"deployed": ("no ", "not ", "unasserted", "does not"), "production": ("no ", "not ", "unasserted", "non-production"), "autonomous": ("no ", "not ", "never", "bounded", "unasserted"), "headless": ("authorized", "unasserted", "private"), "swarm": ("bounded", "never", "no ", "not "), "implemented": ("only if", "source-owned"), "tested": ("source-owned", "not ", "no ")}
@@ -322,31 +404,40 @@ def validate_release_text(registry: dict, errors: list[str]) -> None:
     ]
     hidden_lane_phrases = ("protected local", "local candidate", "unpublished Intake", "unpublished local", "public-main source")
     for public_path in public_surface_paths:
-        public_text = public_path.read_text(encoding="utf-8")
+        public_text = normalize_release_text(public_path.read_text(encoding="utf-8"))
         for phrase in hidden_lane_phrases:
             if re.search(re.escape(phrase), public_text, re.I):
                 fail(errors, f"public surface hidden-lane hint '{phrase}' in {public_path.relative_to(ROOT)}")
-    allowed_roots = {repo["canonical_url"] for repo in registry["repositories"]} | APPROVED_ACCESS_URLS
+    allowed_roots = (
+        {repo["canonical_url"] for repo in registry["repositories"]}
+        | STRUCTURED_PRIVATE_ACCESS_URLS
+    )
+    if narrative_only_root is not None:
+        allowed_roots.add(narrative_only_root)
     for path in text_paths:
         text = path.read_text(encoding="utf-8")
         relative = path.relative_to(ROOT)
         if relative == Path("scripts/validate_profile_package.py") or relative.parts[:2] == ("registry", "schemas"):
             continue  # Validator rules and schemas are meta-language, not release claims.
+        normalized_text = normalize_release_text(text)
         for pattern in forbidden:
-            if pattern.search(text):
+            if pattern.search(normalized_text):
                 fail(errors, f"release text privacy scan: {path.relative_to(ROOT)} matched {pattern.pattern}")
-        for url in iter_owned_github_urls(text):
-            if not release_url_allowed(relative, url, allowed_roots):
+        for url in iter_owned_github_urls(normalized_text):
+            if not release_url_allowed(relative, url, allowed_roots, narrative_only_root):
                 fail(errors, f"release text has undisclosed repository URL: {relative}")
-        if "Digital-Assett-Directory" in text and DAD_URL not in text:
+        if "Digital-Assett-Directory" in normalized_text and DAD_URL not in normalized_text:
             fail(errors, f"release text has a non-canonical DAD identifier: {path.relative_to(ROOT)}")
-        if "Albert-Trial-Simulation-System" in text and ALBERT_URL not in text:
-            fail(errors, f"release text has a non-canonical Albert identifier: {path.relative_to(ROOT)}")
+        if narrative_only_root is not None and has_noncanonical_narrative_identifier(
+            normalized_text,
+            narrative_only_root,
+        ):
+            fail(errors, f"release text has a non-canonical narrative-only identifier: {relative}")
         if relative in {REGISTRY_PATH.relative_to(ROOT), CAPABILITIES_PATH.relative_to(ROOT), Path("registry/portable-workflow-patterns.json")}:
             continue  # Structured DAD and swarm constraints are enforced by schema and cross-reference checks.
         for term, contexts in bounded_terms.items():
-            for match in re.finditer(term, text, re.I):
-                window = text[max(0, match.start() - 120): match.end() + 120].lower()
+            for match in re.finditer(term, normalized_text, re.I):
+                window = normalized_text[max(0, match.start() - 120): match.end() + 120].lower()
                 if not any(context in window for context in contexts):
                     fail(errors, f"unsupported unbounded term '{term}' in {path.relative_to(ROOT)}")
 
@@ -426,10 +517,11 @@ def main() -> int:
     args = parser.parse_args()
     errors: list[str] = []
     registry, capabilities, receipt, receipts = validate_schema_documents(errors)
-    validate_access_url_policy(errors)
+    narrative_only_root = load_narrative_only_access_url(errors)
+    validate_access_url_policy(errors, narrative_only_root)
     validate_cross_references(registry, capabilities, receipt, receipts, errors)
-    validate_markdown_projection(registry, errors)
-    validate_release_text(registry, errors)
+    validate_markdown_projection(registry, narrative_only_root, errors)
+    validate_release_text(registry, narrative_only_root, errors)
     if args.verify_remote:
         verify_remote(registry, errors)
     if errors:
