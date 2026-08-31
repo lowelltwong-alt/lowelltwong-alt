@@ -8,8 +8,10 @@ import json
 import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from html import unescape
 from pathlib import Path
 from urllib.error import HTTPError, URLError
+from urllib.parse import SplitResult, unquote, urlsplit
 from urllib.request import Request, urlopen
 
 try:
@@ -38,6 +40,11 @@ EXPECTED_ALIASES = [
 DAD_URL = "https://github.com/lowelltwong-alt/Digital-Assett-Directory"
 ALBERT_URL = "https://github.com/lowelltwong-alt/Albert-Trial-Simulation-System"
 APPROVED_ACCESS_URLS = {DAD_URL, ALBERT_URL}
+GITHUB_OWNER = "lowelltwong-alt"
+GITHUB_URL_PATTERN = re.compile(
+    r"(?i)(?:https?:)?//(?:www\.)?github\.com\.?(?::[0-9]+)?/[^\s<>\[\]()\"'`]+"
+)
+MARKDOWN_BACKSLASH_ESCAPE = re.compile(r"\\([!\"#$%&'()*+,\-./:;<=>?@\[\]^_`{|}~])")
 
 
 def read_json(path: Path) -> dict:
@@ -52,23 +59,110 @@ def route_key(route: dict) -> tuple[str, str, str]:
     return (route["sha"], route["canonical_path"], route["canonical_url"])
 
 
+def owned_github_url_parts(url: str) -> tuple[SplitResult, list[str], bool] | None:
+    """Parse a GitHub URL that resolves to this account, including encoded forms."""
+    candidate = f"https:{url}" if url.startswith("//") else url
+    try:
+        parsed = urlsplit(candidate)
+    except ValueError:
+        return None
+    normalized_host = (parsed.hostname or "").rstrip(".").casefold()
+    if normalized_host not in {"github.com", "www.github.com"}:
+        return None
+
+    normalized_segments: list[str] = []
+    had_dot_segment = False
+    for segment in unquote(parsed.path).split("/"):
+        if not segment:
+            continue
+        if segment == ".":
+            had_dot_segment = True
+            continue
+        if segment == "..":
+            had_dot_segment = True
+            if normalized_segments:
+                normalized_segments.pop()
+            continue
+        normalized_segments.append(segment)
+    if len(normalized_segments) < 2 or normalized_segments[0].casefold() != GITHUB_OWNER.casefold():
+        return None
+    return parsed, normalized_segments, had_dot_segment
+
+
+def iter_owned_github_urls(text: str):
+    """Yield complete URL tokens that resolve to this GitHub account."""
+    normalized_text = MARKDOWN_BACKSLASH_ESCAPE.sub(r"\1", unescape(text))
+    for match in GITHUB_URL_PATTERN.finditer(normalized_text):
+        url = match.group(0)
+        if owned_github_url_parts(url) is not None:
+            yield url
+
+
 def release_url_allowed(relative: Path, url: str, allowed_roots: set[str]) -> bool:
-    """Keep Albert narrative-only while DAD remains the structured private route."""
-    if url == ALBERT_URL:
-        return relative.suffix.lower() == ".md"
-    return url in allowed_roots
+    """Allow public deep links, but require exact roots for access-controlled repos."""
+    parsed_result = owned_github_url_parts(url)
+    if parsed_result is None:
+        return False
+    parsed, segments, had_dot_segment = parsed_result
+    if had_dot_segment:
+        return False
+    canonical_transport = (
+        parsed.scheme.casefold() == "https"
+        and parsed.netloc.casefold() == "github.com"
+        and url[:8].casefold() == "https://"
+    )
+    if not canonical_transport:
+        return False
+
+    roots_by_name = {
+        unquote(urlsplit(root).path).rstrip("/").rsplit("/", 1)[-1].casefold(): root
+        for root in allowed_roots
+    }
+    canonical_root = roots_by_name.get(segments[1].casefold())
+    if canonical_root is None:
+        return False
+    if canonical_root in APPROVED_ACCESS_URLS:
+        if url != canonical_root:
+            return False
+        if canonical_root == ALBERT_URL:
+            return relative.suffix.lower() == ".md"
+    return True
 
 
 def validate_access_url_policy(errors: list[str]) -> None:
-    allowed_roots = {"https://github.com/lowelltwong-alt/public-example"} | APPROVED_ACCESS_URLS
+    public_root = "https://github.com/lowelltwong-alt/public-example"
+    allowed_roots = {public_root} | APPROVED_ACCESS_URLS
     cases = (
         (Path("README.md"), ALBERT_URL, True, "Albert Markdown disclosure"),
         (Path("registry/example.json"), ALBERT_URL, False, "Albert structured disclosure"),
+        (Path("README.md"), f"{ALBERT_URL}/tree/secret-review-branch", False, "Albert branch suffix"),
+        (Path("README.md"), f"{ALBERT_URL}/blob/secret/private.md", False, "Albert blob suffix"),
+        (Path("README.md"), f"{ALBERT_URL}?ref=secret", False, "Albert query suffix"),
+        (Path("README.md"), f"{ALBERT_URL}#secret", False, "Albert fragment suffix"),
+        (Path("README.md"), f"{ALBERT_URL}%2Ftree%2Fsecret", False, "Albert encoded path suffix"),
+        (Path("README.md"), f"{ALBERT_URL}.git", False, "Albert git suffix"),
+        (Path("README.md"), "https://GITHUB.com/lowelltwong-alt/Albert%2DTrial%2DSimulation%2DSystem/tree/secret", False, "Albert encoded alternate form"),
+        (Path("README.md"), "https:&#47;&#47;github.com/lowelltwong-alt/Albert&#45;Trial&#45;Simulation&#45;System&#47;tree&#47;secret", False, "Albert HTML character-reference form"),
+        (Path("README.md"), r"https:\/\/github.com\/lowelltwong-alt\/Albert-Trial-Simulation-System\/tree\/secret", False, "Albert Markdown backslash-escaped form"),
+        (Path("README.md"), "https://www.github.com/lowelltwong-alt/Albert-Trial-Simulation-System/tree/secret", False, "Albert www host alias"),
+        (Path("README.md"), "https://github.com.:443/lowelltwong-alt/Albert-Trial-Simulation-System/tree/secret", False, "Albert host authority variant"),
+        (Path("README.md"), "//github.com/lowelltwong-alt/Albert-Trial-Simulation-System/tree/secret", False, "Albert protocol-relative form"),
+        (Path("README.md"), "http://github.com/lowelltwong-alt/Albert-Trial-Simulation-System/tree/secret", False, "Albert insecure scheme"),
+        (Path("README.md"), f"{ALBERT_URL}/", False, "Albert trailing slash"),
         (Path("registry/example.json"), DAD_URL, True, "DAD structured private route"),
+        (Path("README.md"), f"{DAD_URL}/tree/secret-review-branch", False, "DAD branch suffix"),
+        (Path("README.md"), f"{public_root}/blob/abc123/README.md", True, "public repository blob path"),
+        (Path("README.md"), f"{public_root}/tree/main", True, "public repository tree path"),
+        (Path("README.md"), f"{public_root}-evil/tree/main", False, "repository segment boundary"),
+        (Path("README.md"), f"{public_root}/../Albert-Trial-Simulation-System/tree/secret", False, "dot-segment private route"),
         (Path("README.md"), "https://github.com/lowelltwong-alt/unknown-private", False, "unknown private route"),
     )
     for relative, url, expected, label in cases:
-        if release_url_allowed(relative, url, allowed_roots) is not expected:
+        extracted = list(iter_owned_github_urls(f"prefix {url} suffix"))
+        normalized_url = MARKDOWN_BACKSLASH_ESCAPE.sub(r"\1", unescape(url))
+        if extracted != [normalized_url]:
+            fail(errors, f"access URL extraction regression: {label}")
+        elif release_url_allowed(relative, extracted[0], allowed_roots) is not expected:
             fail(errors, f"access URL policy regression: {label}")
 
 
@@ -241,7 +335,7 @@ def validate_release_text(registry: dict, errors: list[str]) -> None:
         for pattern in forbidden:
             if pattern.search(text):
                 fail(errors, f"release text privacy scan: {path.relative_to(ROOT)} matched {pattern.pattern}")
-        for url in re.findall(r"https://github\\.com/lowelltwong-alt/[A-Za-z0-9-]+", text):
+        for url in iter_owned_github_urls(text):
             if not release_url_allowed(relative, url, allowed_roots):
                 fail(errors, f"release text has undisclosed repository URL: {relative}")
         if "Digital-Assett-Directory" in text and DAD_URL not in text:
