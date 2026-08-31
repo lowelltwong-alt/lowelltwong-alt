@@ -42,8 +42,8 @@ DAD_URL = "https://github.com/lowelltwong-alt/Digital-Assett-Directory"
 STRUCTURED_PRIVATE_ACCESS_URLS = {DAD_URL}
 NARRATIVE_ONLY_ACCESS_URL_SHA256 = "4cf7299d0f996d643bbfda870e401a52c1f69c6881b57a729e5005dad0535f05"
 GITHUB_OWNER = "lowelltwong-alt"
-GITHUB_URL_PATTERN = re.compile(
-    r"(?i)(?:https?:)?//(?:www\.)?github\.com\.?(?::[0-9]+)?/[^\s<>\[\]()\"'`]+"
+URL_CANDIDATE_PATTERN = re.compile(
+    r"(?i)(?=((?:https?:|[\\/]{2})[^\s<>\[\]()\"'`]+))"
 )
 MARKDOWN_BACKSLASH_ESCAPE = re.compile(r"\\([!\"#$%&'()*+,\-./:;<=>?@\[\]^_`{|}~])")
 SERIALIZED_CODEPOINT_ESCAPES = (
@@ -67,7 +67,7 @@ def route_key(route: dict) -> tuple[str, str, str]:
     return (route["sha"], route["canonical_path"], route["canonical_url"])
 
 
-def normalize_release_text(text: str) -> str:
+def normalize_release_text(text: str, *, markdown_escapes: bool = True) -> str:
     """Normalize renderer- and serializer-level escapes before privacy checks."""
     previous = None
     while text != previous:
@@ -84,13 +84,34 @@ def normalize_release_text(text: str) -> str:
                 text,
             )
         text = unescape(text)
-        text = MARKDOWN_BACKSLASH_ESCAPE.sub(r"\1", text)
+        if markdown_escapes:
+            text = MARKDOWN_BACKSLASH_ESCAPE.sub(r"\1", text)
     return text
+
+
+def normalize_percent_escapes(text: str) -> str:
+    """Decode nested percent escapes to the representation a URL consumer can see."""
+    previous = None
+    while text != previous:
+        previous = text
+        text = unquote(text)
+    return text
+
+
+def normalize_url_candidate(url: str) -> str:
+    """Apply browser-style separator handling for parsing without hiding raw spelling."""
+    candidate = normalize_percent_escapes(url).replace("\\", "/")
+    scheme_match = re.match(r"(?i)^(https?):(.*)$", candidate)
+    if scheme_match is not None:
+        candidate = f"{scheme_match.group(1)}://{scheme_match.group(2).lstrip('/')}"
+    elif candidate.startswith("//"):
+        candidate = f"https:{candidate}"
+    return candidate
 
 
 def owned_github_url_parts(url: str) -> tuple[SplitResult, list[str], bool] | None:
     """Parse a GitHub URL that resolves to this account, including encoded forms."""
-    candidate = f"https:{url}" if url.startswith("//") else url
+    candidate = normalize_url_candidate(url)
     try:
         parsed = urlsplit(candidate)
     except ValueError:
@@ -120,10 +141,34 @@ def owned_github_url_parts(url: str) -> tuple[SplitResult, list[str], bool] | No
 
 def iter_owned_github_urls(text: str):
     """Yield complete URL tokens that resolve to this GitHub account."""
-    normalized_text = normalize_release_text(text)
-    for match in GITHUB_URL_PATTERN.finditer(normalized_text):
-        url = match.group(0)
-        if owned_github_url_parts(url) is not None:
+    scan_texts = (
+        normalize_release_text(text),
+        normalize_release_text(text, markdown_escapes=False),
+    )
+    seen_candidates: set[tuple[str, str, tuple[str, ...], str, str, bool]] = set()
+    for scan_text in scan_texts:
+        for match in URL_CANDIDATE_PATTERN.finditer(scan_text):
+            url = match.group(1)
+            start = match.start(1)
+            if url.startswith(("//", "\\\\")):
+                prefix = scan_text[max(0, start - 6):start].casefold()
+                if prefix.endswith(("http:", "https:")):
+                    continue
+            parsed_result = owned_github_url_parts(url)
+            if parsed_result is None:
+                continue
+            parsed, segments, had_dot_segment = parsed_result
+            candidate_identity = (
+                parsed.scheme.casefold(),
+                parsed.netloc.casefold(),
+                tuple(segments),
+                parsed.query,
+                parsed.fragment,
+                had_dot_segment,
+            )
+            if candidate_identity in seen_candidates:
+                continue
+            seen_candidates.add(candidate_identity)
             yield url
 
 
@@ -188,7 +233,7 @@ def release_url_allowed(
 
 
 def has_noncanonical_narrative_identifier(text: str, narrative_only_root: str) -> bool:
-    normalized_text = normalize_release_text(text)
+    normalized_text = normalize_percent_escapes(normalize_release_text(text))
     repository_name = unquote(urlsplit(narrative_only_root).path).rstrip("/").rsplit("/", 1)[-1]
     text_without_approved_root = normalized_text.replace(narrative_only_root, "")
     return repository_name.casefold() in text_without_approved_root.casefold()
@@ -244,6 +289,21 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         + "\\\n    "
         + f"{narrative_only_root}/tree/secret"[line_split:]
     )
+    encoded_name = repository_name.replace("-", "%2D", 1)
+    backslash_separator_deep_url = (
+        f"https:\\\\github.com\\{GITHUB_OWNER}\\{encoded_name}\\tree\\secret"
+    )
+    single_backslash_scheme_deep_url = (
+        f"https:\\github.com\\{GITHUB_OWNER}\\{encoded_name}\\tree\\secret"
+    )
+    scheme_without_slashes_deep_url = (
+        f"https:github.com\\{GITHUB_OWNER}\\{encoded_name}\\tree\\secret"
+    )
+    percent_backslash_deep_url = backslash_separator_deep_url.replace("\\", "%5C")
+    nested_percent_backslash_deep_url = percent_backslash_deep_url.replace("%", "%25")
+    protocol_relative_backslash_deep_url = (
+        f"\\\\github.com\\{GITHUB_OWNER}\\{encoded_name}\\tree\\secret"
+    )
     cases = (
         (Path("README.md"), narrative_only_root, True, "narrative-only Markdown disclosure"),
         (Path("registry/example.json"), narrative_only_root, False, "narrative-only structured disclosure"),
@@ -267,6 +327,12 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         (Path("README.md"), cross_family_nested_deep_url, False, "narrative-only cross-family nested form"),
         (Path("README.md"), escaped_numeric_prefix_deep_url, False, "narrative-only escaped numeric prefix form"),
         (Path("README.md"), yaml_line_continued_deep_url, False, "narrative-only YAML line continuation form"),
+        (Path("README.md"), backslash_separator_deep_url, False, "narrative-only browser backslash separators"),
+        (Path("README.md"), single_backslash_scheme_deep_url, False, "narrative-only single backslash scheme separator"),
+        (Path("README.md"), scheme_without_slashes_deep_url, False, "narrative-only missing scheme separators"),
+        (Path("README.md"), percent_backslash_deep_url, False, "narrative-only percent-encoded backslash separators"),
+        (Path("README.md"), nested_percent_backslash_deep_url, False, "narrative-only nested percent backslash separators"),
+        (Path("README.md"), protocol_relative_backslash_deep_url, False, "narrative-only protocol-relative backslash separators"),
         (Path("README.md"), narrative_only_root.replace("https://github.com", "https://www.github.com") + "/tree/secret", False, "narrative-only www host alias"),
         (Path("README.md"), narrative_only_root.replace("github.com", "github.com.:443") + "/tree/secret", False, "narrative-only host authority variant"),
         (Path("README.md"), narrative_only_root.removeprefix("https:") + "/tree/secret", False, "narrative-only protocol-relative form"),
@@ -293,6 +359,11 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     yaml_encoded_identifier = "".join(f"\\x{ord(character):02x}" for character in repository_name)
     if not has_noncanonical_narrative_identifier(yaml_encoded_identifier, narrative_only_root):
         fail(errors, "YAML-serialized narrative-only identifier regression")
+    percent_encoded_identifier = "".join(
+        f"%{ord(character):02X}" for character in repository_name
+    )
+    if not has_noncanonical_narrative_identifier(percent_encoded_identifier, narrative_only_root):
+        fail(errors, "percent-encoded narrative-only identifier regression")
     if normalize_release_text(r"\U00110000") != r"\U00110000":
         fail(errors, "out-of-range serialized Unicode regression")
 
