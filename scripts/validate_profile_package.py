@@ -8,6 +8,7 @@ import ast
 import base64
 import binascii
 import bz2
+import codecs
 import gzip
 import hashlib
 import json
@@ -1208,6 +1209,20 @@ def python_literal_projections(
         fail(errors, f"tracked Python source cannot be parsed for privacy checks: {relative}: {error}")
         return []
 
+    static_codec_module_names = {"codecs"}
+    static_codec_callable_aliases: dict[str, str] = {}
+    for candidate in ast.walk(tree):
+        if isinstance(candidate, ast.Import):
+            for alias in candidate.names:
+                if alias.name == "codecs":
+                    static_codec_module_names.add(alias.asname or "codecs")
+        elif isinstance(candidate, ast.ImportFrom) and candidate.module == "codecs":
+            for alias in candidate.names:
+                if alias.name in {"decode", "encode"}:
+                    static_codec_callable_aliases[
+                        alias.asname or alias.name
+                    ] = f"codecs.{alias.name}"
+
     safe_scalar_types = {
         str,
         bytes,
@@ -1227,6 +1242,10 @@ def python_literal_projections(
         "ord",
         "tuple",
     })
+    static_callable_names = static_builtin_names | {
+        "codecs.decode",
+        "codecs.encode",
+    }
 
     def static_builtin_token(name: str) -> tuple[str, str]:
         return static_builtin_marker, name
@@ -1237,7 +1256,7 @@ def python_literal_projections(
             and len(value) == 2
             and value[0] == static_builtin_marker
             and isinstance(value[1], str)
-            and value[1] in static_builtin_names
+            and value[1] in static_callable_names
         ):
             return value[1]
         return None
@@ -1941,6 +1960,123 @@ def python_literal_projections(
             return None
         return bytes(normalized)
 
+    def apply_static_text_codec(
+        operation: str,
+        arguments: tuple[object, ...],
+        keyword_arguments: dict[str, object],
+    ) -> str | bytes | None:
+        keyword_arguments = dict(keyword_arguments)
+        if arguments:
+            receiver = arguments[0]
+            if "obj" in keyword_arguments:
+                projection_failure("static text-codec call repeats the receiver")
+                return None
+            option_arguments = arguments[1:]
+        elif "obj" in keyword_arguments:
+            receiver = keyword_arguments.pop("obj")
+            option_arguments = ()
+        else:
+            projection_failure("static text-codec call is missing its receiver")
+            return None
+        if len(option_arguments) > 2:
+            projection_failure("static text-codec call has unsupported positional arguments")
+            return None
+        options: dict[str, object] = {
+            "encoding": "utf-8",
+            "errors": "strict",
+        }
+        option_names = ("encoding", "errors")
+        explicit_options: set[str] = set()
+        for index, value in enumerate(option_arguments):
+            option_name = option_names[index]
+            options[option_name] = value
+            explicit_options.add(option_name)
+        for name, value in keyword_arguments.items():
+            if name not in options:
+                projection_failure("static text-codec call has an unsupported keyword")
+                return None
+            if name in explicit_options:
+                projection_failure("static text-codec call repeats an explicit option")
+                return None
+            options[name] = value
+            explicit_options.add(name)
+        encoding = options["encoding"]
+        error_policy = options["errors"]
+        if (
+            not isinstance(receiver, (str, bytes))
+            or not isinstance(encoding, str)
+            or not isinstance(error_policy, str)
+        ):
+            if isinstance(receiver, (str, bytes)):
+                projection_failure("static text-codec call has an unresolved option")
+            return None
+        if len(receiver) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+            projection_failure("static text-codec input exceeds the bounded projection limit")
+            return None
+        if error_policy != "strict":
+            projection_failure("static text-codec call is outside the strict error policy")
+            return None
+        normalized_codec = encoding.casefold().replace("-", "_").replace(" ", "_")
+        codec_names = {
+            "ascii": "ascii",
+            "iso8859_1": "iso-8859-1",
+            "latin1": "latin-1",
+            "latin_1": "latin-1",
+            "raw_unicode_escape": "raw-unicode-escape",
+            "rot13": "rot_13",
+            "rot_13": "rot_13",
+            "unicode_escape": "unicode-escape",
+            "utf7": "utf-7",
+            "utf_7": "utf-7",
+            "utf8": "utf-8",
+            "utf_8": "utf-8",
+            "utf8_sig": "utf-8-sig",
+            "utf_8_sig": "utf-8-sig",
+            "utf16": "utf-16",
+            "utf_16": "utf-16",
+            "utf16_be": "utf-16-be",
+            "utf_16_be": "utf-16-be",
+            "utf16_le": "utf-16-le",
+            "utf_16_le": "utf-16-le",
+            "utf32": "utf-32",
+            "utf_32": "utf-32",
+            "utf32_be": "utf-32-be",
+            "utf_32_be": "utf-32-be",
+            "utf32_le": "utf-32-le",
+            "utf_32_le": "utf-32-le",
+        }
+        canonical_codec = codec_names.get(normalized_codec)
+        if canonical_codec is None:
+            projection_failure(
+                "static text-codec call is outside the bounded codec policy: "
+                + normalized_codec
+            )
+            return None
+        try:
+            if canonical_codec == "rot_13":
+                transformed = (
+                    codecs.decode(receiver, canonical_codec, "strict")
+                    if operation == "decode"
+                    else codecs.encode(receiver, canonical_codec, "strict")
+                )
+            elif operation == "decode" and isinstance(receiver, bytes):
+                transformed = receiver.decode(canonical_codec, "strict")
+            elif operation == "encode" and isinstance(receiver, str):
+                transformed = receiver.encode(canonical_codec, "strict")
+            else:
+                return None
+        except MemoryError:
+            projection_failure("static text-codec call exhausted the bounded projection budget")
+            return None
+        except (LookupError, TypeError, UnicodeError, ValueError):
+            return None
+        if not isinstance(transformed, (str, bytes)):
+            return None
+        if len(transformed) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+            projection_failure("static text-codec output exceeds the bounded projection limit")
+            return None
+        return transformed
+
     def apply_static_builtin(
         name: str,
         arguments: tuple[object, ...],
@@ -1951,6 +2087,12 @@ def python_literal_projections(
         if depth > MAX_PYTHON_STATIC_EXPRESSION_DEPTH:
             projection_failure("static builtin call exceeds the bounded evaluation depth")
             return None
+        if name in {"codecs.decode", "codecs.encode"}:
+            return apply_static_text_codec(
+                name.removeprefix("codecs."),
+                arguments,
+                keyword_arguments,
+            )
         if (
             name in {"bytes", "bytearray"}
             and len(arguments) == 1
@@ -2172,9 +2314,20 @@ def python_literal_projections(
         if isinstance(node, ast.Name):
             if node.id in environment:
                 return environment[node.id]
+            if node.id in static_codec_callable_aliases:
+                return static_builtin_token(
+                    static_codec_callable_aliases[node.id]
+                )
             if node.id in static_builtin_names:
                 return static_builtin_token(node.id)
             return None
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id in static_codec_module_names
+            and node.attr in {"decode", "encode"}
+        ):
+            return static_builtin_token(f"codecs.{node.attr}")
         if isinstance(node, ast.UnaryOp):
             operand = static_value(node.operand, environment, depth + 1)
             if isinstance(node.op, ast.Not) and is_safe_materialized(operand):
@@ -2256,12 +2409,40 @@ def python_literal_projections(
                     return None
                 values.append(value)
             return "".join(values)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+        if isinstance(node, ast.Call) and isinstance(
+            node.func,
+            (ast.Name, ast.Attribute),
+        ):
             callable_value = static_value(node.func, environment, depth + 1)
             callable_name = static_builtin_name(callable_value)
             if callable_name is not None:
                 call_arguments = static_call_arguments(node, environment, depth + 1)
                 if call_arguments is None:
+                    if (
+                        callable_name in {"codecs.decode", "codecs.encode"}
+                        and (
+                            any(keyword.arg is None for keyword in node.keywords)
+                            or any(keyword.arg == "obj" for keyword in node.keywords)
+                            or any(
+                                isinstance(argument, ast.Starred)
+                                for argument in node.args
+                            )
+                            or (
+                                bool(node.args)
+                                and isinstance(
+                                    static_value(
+                                        node.args[0],
+                                        environment,
+                                        depth + 1,
+                                    ),
+                                    (str, bytes),
+                                )
+                            )
+                        )
+                    ):
+                        projection_failure(
+                            "static text-codec call has unresolved arguments"
+                        )
                     return None
                 arguments, keyword_arguments = call_arguments
                 return apply_static_builtin(
@@ -2298,59 +2479,20 @@ def python_literal_projections(
                     attribute == "decode" and isinstance(receiver, bytes)
                 ) or (attribute == "encode" and isinstance(receiver, str))
                 if receiver_matches:
-                    if len(receiver) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
-                        projection_failure("static codec input exceeds the bounded projection limit")
+                    codec_arguments = static_call_arguments(
+                        node,
+                        environment,
+                        depth + 1,
+                    )
+                    if codec_arguments is None:
+                        projection_failure("static codec call has unresolved arguments")
                         return None
-                    if len(node.args) > 2:
-                        projection_failure("static codec call has unsupported positional arguments")
-                        return None
-                    options: dict[str, str] = {"encoding": "utf-8", "errors": "strict"}
-                    option_names = ("encoding", "errors")
-                    explicit_options: set[str] = set()
-                    for index, argument_node in enumerate(node.args):
-                        option = static_value(argument_node, environment, depth + 1)
-                        if not isinstance(option, str):
-                            projection_failure("static codec call has an unresolved option")
-                            return None
-                        option_name = option_names[index]
-                        options[option_name] = option
-                        explicit_options.add(option_name)
-                    for keyword in node.keywords:
-                        if keyword.arg not in options:
-                            projection_failure("static codec call has an unsupported keyword")
-                            return None
-                        if keyword.arg in explicit_options:
-                            projection_failure("static codec call repeats an explicit option")
-                            return None
-                        option = static_value(keyword.value, environment, depth + 1)
-                        if not isinstance(option, str):
-                            projection_failure("static codec call has an unresolved option")
-                            return None
-                        options[keyword.arg] = option
-                        explicit_options.add(keyword.arg)
-                    encoding = options["encoding"].casefold().replace("_", "-")
-                    if encoding not in {
-                        "ascii",
-                        "iso-8859-1",
-                        "latin-1",
-                        "latin1",
-                        "utf-8",
-                        "utf8",
-                    } or options["errors"] != "strict":
-                        projection_failure("static codec call is outside the bounded codec policy")
-                        return None
-                    try:
-                        transformed = (
-                            receiver.decode(options["encoding"], options["errors"])
-                            if isinstance(receiver, bytes)
-                            else receiver.encode(options["encoding"], options["errors"])
-                        )
-                    except (LookupError, UnicodeError):
-                        return None
-                    if len(transformed) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
-                        projection_failure("static codec output exceeds the bounded projection limit")
-                        return None
-                    return transformed
+                    arguments, keyword_arguments = codec_arguments
+                    return apply_static_text_codec(
+                        attribute,
+                        (receiver, *arguments),
+                        keyword_arguments,
+                    )
             receiver = static_value(node.func.value, environment, depth + 1)
             if attribute == "format" and isinstance(receiver, str):
                 arguments = tuple(
@@ -3190,6 +3332,10 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     hexadecimal_byte_bases = json.dumps([16 for _ in private_deep_bytes])
     inferred_byte_bases = json.dumps([0 for _ in private_deep_bytes])
     character_deep_url_list = json.dumps(list(private_deep_url))
+    rot13_private_deep_url = codecs.encode(private_deep_url, "rot_13")
+    utf16_private_deep_bytes_literal = repr(
+        private_deep_url.encode("utf-16-le")
+    )
 
     def raw_deflate(payload: bytes) -> bytes:
         compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
@@ -3539,6 +3685,92 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             "Python inferred-base multi-iterable map decoding",
         ),
         (
+            "import codecs\n"
+            + "candidate = codecs.decode("
+            + json.dumps(rot13_private_deep_url)
+            + ', "rot_13")',
+            "Python ROT13 codec decoding",
+        ),
+        (
+            "import codecs as transformer\n"
+            + "candidate = transformer.decode("
+            + json.dumps(rot13_private_deep_url)
+            + ', encoding="rot-13")',
+            "Python aliased-module ROT13 codec decoding",
+        ),
+        (
+            "from codecs import decode as transform\n"
+            + "candidate = transform("
+            + json.dumps(rot13_private_deep_url)
+            + ', "rot13", errors="strict")',
+            "Python imported ROT13 codec decoding",
+        ),
+        (
+            "import codecs\n"
+            + "transform = codecs.encode\n"
+            + "candidate = transform("
+            + json.dumps(rot13_private_deep_url)
+            + ', "rot_13")',
+            "Python assigned ROT13 codec encoding",
+        ),
+        (
+            "import codecs\n"
+            + "candidate = codecs.decode("
+            + utf16_private_deep_bytes_literal
+            + ', "utf-16-le")',
+            "Python UTF-16 codec decoding",
+        ),
+        (
+            "import codecs\n"
+            + "candidate = codecs.decode(obj="
+            + json.dumps(rot13_private_deep_url)
+            + ', encoding="rot_13", errors="strict")',
+            "Python all-keyword ROT13 codec decoding",
+        ),
+        (
+            "import codecs\n"
+            + "candidate = codecs.encode(errors=\"strict\", obj="
+            + json.dumps(rot13_private_deep_url)
+            + ', encoding="rot13")',
+            "Python reordered-keyword ROT13 codec encoding",
+        ),
+        (
+            "import codecs as transformer\n"
+            + "candidate = transformer.decode(encoding=\"rot-13\", obj="
+            + json.dumps(rot13_private_deep_url)
+            + ")",
+            "Python aliased-module keyword ROT13 codec decoding",
+        ),
+        (
+            "from codecs import encode as transform\n"
+            + "candidate = transform(obj="
+            + json.dumps(rot13_private_deep_url)
+            + ', encoding="rot_13")',
+            "Python imported keyword ROT13 codec encoding",
+        ),
+        (
+            "import codecs\n"
+            + "transform = codecs.decode\n"
+            + "candidate = transform(*(), obj="
+            + json.dumps(rot13_private_deep_url)
+            + ', encoding="rot_13")',
+            "Python assigned empty-star keyword ROT13 decoding",
+        ),
+        (
+            "import codecs\n"
+            + "candidate = codecs.decode(*("
+            + json.dumps(rot13_private_deep_url)
+            + ', "rot_13"))',
+            "Python static tuple-star ROT13 decoding",
+        ),
+        (
+            "import codecs\n"
+            + "candidate = codecs.decode(*(value for value in ("
+            + json.dumps(rot13_private_deep_url)
+            + ', "rot_13")))',
+            "Python static generator-star ROT13 decoding",
+        ),
+        (
             'candidate = zlib.decompress(bytes.fromhex("'
             + zlib.compress(private_deep_bytes).hex()
             + '")).decode()',
@@ -3630,6 +3862,117 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     )
     if invalid_integer_base_errors or private_deep_url in invalid_integer_base_projections:
         fail(errors, "Python invalid integer-base control regression")
+
+    oversized_codec_literal = bytes(
+        MAX_PYTHON_STATIC_PROJECTION_CHARS + 1
+    ).decode("ascii")
+    codec_bound_errors: list[str] = []
+    python_literal_projections(
+        "import codecs\n"
+        + "candidate = codecs.decode("
+        + json.dumps(oversized_codec_literal)
+        + ', "rot_13")',
+        Path("example.py"),
+        codec_bound_errors,
+        protected_identifier=repository_name,
+    )
+    if not codec_bound_errors:
+        fail(errors, "Python static text-codec input-bound regression")
+
+    unsupported_codec_errors: list[str] = []
+    python_literal_projections(
+        'import codecs\ncandidate = codecs.decode("ordinary", "cp500")',
+        Path("example.py"),
+        unsupported_codec_errors,
+        protected_identifier=repository_name,
+    )
+    if not unsupported_codec_errors:
+        fail(errors, "Python unsupported static text-codec regression")
+
+    benign_codec_errors: list[str] = []
+    benign_codec_projections = python_literal_projections(
+        'import codecs\ncandidate = codecs.decode("beqvanel", "rot_13")',
+        Path("example.py"),
+        benign_codec_errors,
+        protected_identifier=repository_name,
+    )
+    if benign_codec_errors or "ordinary" not in benign_codec_projections:
+        fail(errors, "Python benign static text-codec regression")
+
+    expanded_codec_keyword_errors: list[str] = []
+    python_literal_projections(
+        "import codecs\n"
+        + "options = {\"obj\": "
+        + json.dumps(rot13_private_deep_url)
+        + ', "encoding": "rot_13", "errors": "strict"}\n'
+        + "candidate = codecs.decode(**options)",
+        Path("example.py"),
+        expanded_codec_keyword_errors,
+        protected_identifier=repository_name,
+    )
+    if not expanded_codec_keyword_errors:
+        fail(errors, "Python expanded static text-codec keyword regression")
+
+    duplicate_codec_receiver_errors: list[str] = []
+    python_literal_projections(
+        "import codecs\n"
+        + "candidate = codecs.decode("
+        + json.dumps(rot13_private_deep_url)
+        + ", obj="
+        + json.dumps(rot13_private_deep_url)
+        + ', encoding="rot_13")',
+        Path("example.py"),
+        duplicate_codec_receiver_errors,
+        protected_identifier=repository_name,
+    )
+    if not duplicate_codec_receiver_errors:
+        fail(errors, "Python duplicate static text-codec receiver regression")
+
+    unresolved_codec_receiver_errors: list[str] = []
+    python_literal_projections(
+        'import codecs\ncandidate = codecs.decode(obj=dynamic(), encoding="rot_13")',
+        Path("example.py"),
+        unresolved_codec_receiver_errors,
+        protected_identifier=repository_name,
+    )
+    if not unresolved_codec_receiver_errors:
+        fail(errors, "Python unresolved static text-codec receiver regression")
+
+    unresolved_codec_star_cases = (
+        (
+            "import codecs\ncandidate = codecs.decode(*iter(("
+            + json.dumps(rot13_private_deep_url)
+            + ', "rot_13")))',
+            "direct codec callable",
+        ),
+        (
+            "import codecs\ntransform = codecs.decode\n"
+            + "candidate = transform(*iter(("
+            + json.dumps(rot13_private_deep_url)
+            + ', "rot_13")))',
+            "assigned codec callable",
+        ),
+        (
+            "from codecs import decode as transform\n"
+            + "candidate = transform(*iter(("
+            + json.dumps(rot13_private_deep_url)
+            + ', "rot_13")))',
+            "imported codec callable",
+        ),
+    )
+    for source, label in unresolved_codec_star_cases:
+        unresolved_codec_star_errors: list[str] = []
+        python_literal_projections(
+            source,
+            Path("example.py"),
+            unresolved_codec_star_errors,
+            protected_identifier=repository_name,
+        )
+        if not unresolved_codec_star_errors:
+            fail(
+                errors,
+                f"Python unresolved static text-codec star regression: {label}",
+            )
 
     cumulative_compressed_payload = b"".join(
         zlib.compress(bytes(65 + index for _ in range(40_000)))
