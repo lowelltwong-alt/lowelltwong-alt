@@ -7,13 +7,17 @@ import argparse
 import ast
 import base64
 import binascii
+import bz2
+import gzip
 import hashlib
 import json
+import lzma
 import re
 import string
 import subprocess
 import sys
 import unicodedata
+import zlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from html import unescape
 from pathlib import Path
@@ -59,6 +63,7 @@ MAX_STATIC_JS_DESTRUCTURE_CHARS = 4_096
 MAX_STATIC_LANGUAGE_ENCODED_CHARS = 131_072
 MAX_STATIC_LANGUAGE_BASE64_CHARS = 87_384
 MAX_EXACT_JAVASCRIPT_INTEGER = 9_007_199_254_740_991
+MAX_STATIC_LZMA_MEMORY_BYTES = 16_777_216
 JAVASCRIPT_SUFFIXES = frozenset({
     ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts",
 })
@@ -1368,6 +1373,107 @@ def python_literal_projections(
             padding = -len(value) % multiple
             return value.ljust(len(value) + padding, b"=")
 
+        def bounded_zlib(value: bytes, window_bits: int) -> tuple[bytes, bytes]:
+            decoder = zlib.decompressobj(window_bits)
+            decoded = decoder.decompress(
+                value,
+                MAX_PYTHON_STATIC_PROJECTION_CHARS + 1,
+            )
+            if (
+                len(decoded) > MAX_PYTHON_STATIC_PROJECTION_CHARS
+                or decoder.unconsumed_tail
+            ):
+                raise OverflowError
+            if not decoder.eof:
+                raise ValueError
+            remaining = MAX_PYTHON_STATIC_PROJECTION_CHARS + 1 - len(decoded)
+            if remaining > 0:
+                decoded += decoder.flush(remaining)
+            if len(decoded) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                raise OverflowError
+            if len(decoder.unused_data) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                raise OverflowError
+            return decoded, decoder.unused_data
+
+        def bounded_bz2(value: bytes) -> tuple[bytes, bytes]:
+            decoder = bz2.BZ2Decompressor()
+            decoded = decoder.decompress(
+                value,
+                max_length=MAX_PYTHON_STATIC_PROJECTION_CHARS + 1,
+            )
+            if len(decoded) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                raise OverflowError
+            if not decoder.eof:
+                raise ValueError
+            if len(decoder.unused_data) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                raise OverflowError
+            return decoded, decoder.unused_data
+
+        def bounded_lzma(value: bytes) -> tuple[bytes, bytes]:
+            decoder = lzma.LZMADecompressor(
+                memlimit=MAX_STATIC_LZMA_MEMORY_BYTES,
+            )
+            try:
+                decoded = decoder.decompress(
+                    value,
+                    max_length=MAX_PYTHON_STATIC_PROJECTION_CHARS + 1,
+                )
+            except lzma.LZMAError as error:
+                if "memory usage limit" in str(error).casefold():
+                    raise OverflowError from error
+                raise
+            if len(decoded) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                raise OverflowError
+            if not decoder.eof:
+                raise ValueError
+            if len(decoder.unused_data) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                raise OverflowError
+            return decoded, decoder.unused_data
+
+        def decompression_closure(value: bytes) -> list[bytes]:
+            pending_bytes = [(value, 0)]
+            seen_bytes = {value}
+            decoded_bytes = len(value)
+            while pending_bytes:
+                current, depth = pending_bytes.pop()
+                if depth >= 4:
+                    continue
+                decoders = (
+                    lambda payload: bounded_zlib(payload, zlib.MAX_WBITS),
+                    lambda payload: bounded_zlib(payload, zlib.MAX_WBITS | 16),
+                    lambda payload: bounded_zlib(payload, -zlib.MAX_WBITS),
+                    bounded_bz2,
+                    bounded_lzma,
+                )
+                for decoder in decoders:
+                    try:
+                        decoded, unused_data = decoder(current)
+                    except (MemoryError, OverflowError):
+                        projection_failure(
+                            "compressed Python payload exceeds a bounded resource limit"
+                        )
+                        return []
+                    except (EOFError, OSError, ValueError, zlib.error, lzma.LZMAError):
+                        continue
+                    for candidate, next_depth in (
+                        (decoded, depth + 1),
+                        (unused_data, depth),
+                    ):
+                        if not candidate or candidate in seen_bytes:
+                            continue
+                        seen_bytes.add(candidate)
+                        decoded_bytes += len(candidate)
+                        if (
+                            len(seen_bytes) > 64
+                            or decoded_bytes > MAX_PYTHON_STATIC_TOTAL_CHARS
+                        ):
+                            projection_failure(
+                                "compressed Python payloads exceed the bounded decode budget"
+                            )
+                            return []
+                        pending_bytes.append((candidate, next_depth))
+            return list(seen_bytes)
+
         while pending:
             candidate, decode_depth = pending.pop()
             if len(candidate) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
@@ -1423,29 +1529,26 @@ def python_literal_projections(
                             ValueError,
                         ):
                             continue
-                        if (
-                            not decoded
-                            or len(decoded) > MAX_PYTHON_STATIC_PROJECTION_CHARS
-                            or not all(
+                        for projected_bytes in decompression_closure(decoded):
+                            if not all(
                                 byte in {9, 10, 13} or 32 <= byte <= 126
-                                for byte in decoded
-                            )
-                        ):
-                            continue
-                        text = decoded.decode("ascii")
-                        if text in seen:
-                            continue
-                        seen.add(text)
-                        generated_chars += len(text)
-                        pending.append((text, decode_depth + 1))
-                        if (
-                            len(seen) > MAX_PYTHON_STATIC_SEQUENCE_ITEMS
-                            or generated_chars > MAX_PYTHON_STATIC_TOTAL_CHARS
-                        ):
-                            projection_failure(
-                                "serialized Python payloads exceed the bounded decode budget"
-                            )
-                            return
+                                for byte in projected_bytes
+                            ):
+                                continue
+                            text = projected_bytes.decode("ascii")
+                            if text in seen:
+                                continue
+                            seen.add(text)
+                            generated_chars += len(text)
+                            pending.append((text, decode_depth + 1))
+                            if (
+                                len(seen) > MAX_PYTHON_STATIC_SEQUENCE_ITEMS
+                                or generated_chars > MAX_PYTHON_STATIC_TOTAL_CHARS
+                            ):
+                                projection_failure(
+                                    "serialized Python payloads exceed the bounded decode budget"
+                                )
+                                return
 
     def stored_text_size(environment: dict[str, object]) -> int:
         return sum(materialized_text_size(value) for value in environment.values())
@@ -2786,6 +2889,12 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     named_unicode_deep_url = private_deep_url.replace("-", r"\N{HYPHEN-MINUS}")
     hexadecimal_deep_url = private_deep_url.encode("utf-8").hex()
     private_deep_bytes = private_deep_url.encode("utf-8")
+
+    def raw_deflate(payload: bytes) -> bytes:
+        compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+        return compressor.compress(payload) + compressor.flush()
+
+    ordinary_compressed_bytes = b"ordinary"
     serialized_private_payloads = {
         "Ascii85": base64.a85encode(private_deep_bytes).decode("ascii"),
         "Base16": base64.b16encode(private_deep_bytes).decode("ascii"),
@@ -2794,6 +2903,36 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         "Base64": base64.b64encode(private_deep_bytes).decode("ascii"),
         "Base85": base64.b85encode(private_deep_bytes).decode("ascii"),
         "URL-safe Base64": base64.urlsafe_b64encode(private_deep_bytes).decode("ascii"),
+        "Zlib inside Base16": zlib.compress(private_deep_bytes).hex(),
+        "Gzip inside Base16": gzip.compress(private_deep_bytes).hex(),
+        "Bzip2 inside Base16": bz2.compress(private_deep_bytes).hex(),
+        "LZMA inside Base16": lzma.compress(private_deep_bytes).hex(),
+        "Nested zlib inside Base16": zlib.compress(
+            zlib.compress(private_deep_bytes)
+        ).hex(),
+        "Concatenated zlib member inside Base16": (
+            zlib.compress(ordinary_compressed_bytes)
+            + zlib.compress(private_deep_bytes)
+        ).hex(),
+        "Concatenated gzip member inside Base16": (
+            gzip.compress(ordinary_compressed_bytes)
+            + gzip.compress(private_deep_bytes)
+        ).hex(),
+        "Concatenated raw-deflate member inside Base16": (
+            raw_deflate(ordinary_compressed_bytes)
+            + raw_deflate(private_deep_bytes)
+        ).hex(),
+        "Concatenated bzip2 member inside Base16": (
+            bz2.compress(ordinary_compressed_bytes)
+            + bz2.compress(private_deep_bytes)
+        ).hex(),
+        "Concatenated LZMA member inside Base16": (
+            lzma.compress(ordinary_compressed_bytes)
+            + lzma.compress(private_deep_bytes)
+        ).hex(),
+        "Zlib trailing plaintext inside Base16": (
+            zlib.compress(ordinary_compressed_bytes) + private_deep_bytes
+        ).hex(),
         "nested Base64": base64.b64encode(
             base64.b64encode(private_deep_bytes)
         ).decode("ascii"),
@@ -3000,11 +3139,22 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             f'candidate = bytearray.fromhex("{hexadecimal_deep_url}").decode(encoding="utf-8")',
             "Python static hexadecimal bytearray decoding",
         ),
+        (
+            'candidate = zlib.decompress(bytes.fromhex("'
+            + zlib.compress(private_deep_bytes).hex()
+            + '")).decode()',
+            "Python bounded zlib decoding",
+        ),
         (f'candidate = "{named_unicode_deep_url}"', "Python named-Unicode string"),
     )
     for source, label in python_literal_cases:
         parse_errors: list[str] = []
-        projections = python_literal_projections(source, Path("example.py"), parse_errors)
+        projections = python_literal_projections(
+            source,
+            Path("example.py"),
+            parse_errors,
+            protected_identifier=repository_name,
+        )
         if parse_errors or private_deep_url not in projections:
             fail(errors, f"Python literal privacy projection regression: {label}")
 
@@ -3036,6 +3186,47 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     )
     if aliased_base64_errors or private_deep_url not in aliased_base64_projections:
         fail(errors, "Python serialized-content alias regression")
+
+    oversized_compressed_payload = zlib.compress(
+        bytes(MAX_PYTHON_STATIC_PROJECTION_CHARS + 1)
+    ).hex()
+    compressed_bound_errors: list[str] = []
+    python_literal_projections(
+        "payload = " + json.dumps(oversized_compressed_payload),
+        Path("example.py"),
+        compressed_bound_errors,
+        protected_identifier=repository_name,
+    )
+    if not compressed_bound_errors:
+        fail(errors, "Python compressed-payload output-bound regression")
+
+    cumulative_compressed_payload = b"".join(
+        zlib.compress(bytes(65 + index for _ in range(40_000)))
+        for index in range(27)
+    ).hex()
+    cumulative_compressed_errors: list[str] = []
+    python_literal_projections(
+        "payload = " + json.dumps(cumulative_compressed_payload),
+        Path("example.py"),
+        cumulative_compressed_errors,
+        protected_identifier=repository_name,
+    )
+    if not cumulative_compressed_errors:
+        fail(errors, "Python cumulative compressed-payload budget regression")
+
+    memory_limited_lzma_payload = bytearray(
+        lzma.compress(b"ordinary", format=lzma.FORMAT_ALONE)
+    )
+    memory_limited_lzma_payload[1:5] = (33_554_432).to_bytes(4, "little")
+    lzma_memory_errors: list[str] = []
+    python_literal_projections(
+        "payload = " + json.dumps(memory_limited_lzma_payload.hex()),
+        Path("example.py"),
+        lzma_memory_errors,
+        protected_identifier=repository_name,
+    )
+    if not lzma_memory_errors:
+        fail(errors, "Python LZMA memory-limit regression")
 
     base64_payload = serialized_private_payloads["Base64"]
     payload_split = len(base64_payload) // 2
