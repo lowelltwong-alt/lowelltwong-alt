@@ -54,9 +54,15 @@ MAX_PYTHON_STATIC_BINDINGS = 2_048
 MAX_PYTHON_STATIC_SEQUENCE_ITEMS = 2_048
 MAX_PYTHON_STATIC_TOTAL_CHARS = 1_048_576
 MAX_STATIC_LANGUAGE_PROJECTION_CHARS = 65_536
+MAX_STATIC_JS_DESTRUCTURE_CHARS = 4_096
 MAX_STATIC_LANGUAGE_ENCODED_CHARS = 131_072
 MAX_STATIC_LANGUAGE_BASE64_CHARS = 87_384
 MAX_EXACT_JAVASCRIPT_INTEGER = 9_007_199_254_740_991
+JAVASCRIPT_SUFFIXES = frozenset({
+    ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts",
+})
+POWERSHELL_SUFFIXES = frozenset({".ps1", ".psm1", ".psd1"})
+ALLOWED_RELEASE_PYTHON_PATHS = frozenset({"scripts/validate_profile_package.py"})
 URL_CANDIDATE_PATTERN = re.compile(
     r"(?i)(?=((?:https?:|[\\/]{2})[^\s<>\[\]()\"'`]+))"
 )
@@ -81,11 +87,27 @@ QUOTED_TEXT_LITERAL = re.compile(
 )
 
 STATIC_JS_CHAR_CALL = re.compile(
-    r"(?is)\bString\s*\.\s*(fromCharCode|fromCodePoint)\s*\(([^()]*)\)"
+    r"(?s)\bString\s*\.\s*(fromCharCode|fromCodePoint)\s*\(([^()]*)\)"
 )
 STATIC_JS_APPLY_CALL = re.compile(
-    r"(?is)\bString\s*\.\s*(fromCharCode|fromCodePoint)\s*\.\s*apply\s*"
+    r"(?s)\bString\s*\.\s*(fromCharCode|fromCodePoint)\s*\.\s*apply\s*"
     r"\(\s*[^,()]{1,256},\s*\[([^\[\]()]*)\]\s*\)"
+)
+STATIC_JS_CHAR_MARKER = re.compile(
+    r"(?s)\bString\s*(?:(?:\.|\?\.)\s*(?:fromCharCode|fromCodePoint)\b|"
+    r"(?:\?\.\s*)?\[\s*(['\"\x60])(?:fromCharCode|fromCodePoint)\1\s*\])"
+)
+STATIC_JS_STRING_DESTRUCTURE_TARGET = re.compile(
+    r"(?s)\}\s*=\s*String\b"
+)
+STATIC_JS_STRING_DESTRUCTURE_NAME = re.compile(
+    r"\b(?:fromCharCode|fromCodePoint)\b"
+)
+STATIC_JS_STRING_DESTRUCTURE_COMPUTED = re.compile(
+    r"\[\s*(['\"\x60])(?:fromCharCode|fromCodePoint)\1\s*\]"
+)
+STATIC_JS_STRING_DESTRUCTURE_QUOTED = re.compile(
+    r"(['\"\x60])(?:fromCharCode|fromCodePoint)\1\s*(:)"
 )
 STATIC_JS_ATOB_CALL = re.compile(
     r"(?is)\batob\s*\(\s*(['\"\x60])(.*?)\1\s*\)"
@@ -523,6 +545,47 @@ def static_language_projections(text: str, relative: Path, errors: list[str]) ->
                     add(match, value)
                 except (ValueError, UnicodeError):
                     add_error("recognized JavaScript character constructor is unresolved or malformed")
+        for marker in STATIC_JS_CHAR_MARKER.finditer(text):
+            if not executable(marker):
+                continue
+            if not any(start <= marker.start() < end for start, end in covered_spans):
+                add_error("recognized JavaScript character constructor reference is unresolved")
+        for target in STATIC_JS_STRING_DESTRUCTURE_TARGET.finditer(text):
+            if not executable(target):
+                continue
+            lower_bound = max(0, target.start() - MAX_STATIC_JS_DESTRUCTURE_CHARS)
+            depth = 0
+            opening_brace = None
+            for position in range(target.start(), lower_bound - 1, -1):
+                if not code_mask[position]:
+                    continue
+                if text[position] == "}":
+                    depth += 1
+                elif text[position] == "{":
+                    depth -= 1
+                    if depth == 0:
+                        opening_brace = position
+                        break
+            if opening_brace is None:
+                add_error("recognized JavaScript String destructuring exceeds scan bound")
+                continue
+            destructuring = text[opening_brace:target.start() + 1]
+            blocked = any(
+                code_mask[opening_brace + marker.start()]
+                for marker in STATIC_JS_STRING_DESTRUCTURE_NAME.finditer(destructuring)
+            )
+            if not blocked:
+                blocked = any(
+                    code_mask[opening_brace + marker.start()]
+                    for marker in STATIC_JS_STRING_DESTRUCTURE_COMPUTED.finditer(destructuring)
+                )
+            if not blocked:
+                blocked = any(
+                    code_mask[opening_brace + marker.start(2)]
+                    for marker in STATIC_JS_STRING_DESTRUCTURE_QUOTED.finditer(destructuring)
+                )
+            if blocked:
+                add_error("recognized JavaScript String destructuring is unresolved")
         for match in STATIC_JS_ATOB_CALL.finditer(text):
             if not executable(match):
                 continue
@@ -626,6 +689,16 @@ def fail(errors: list[str], message: str) -> None:
 
 def route_key(route: dict) -> tuple[str, str, str]:
     return (route["sha"], route["canonical_path"], route["canonical_url"])
+
+
+def release_path_family_allowed(relative: Path) -> bool:
+    """Keep the public profile surface data-only except for its validator."""
+    suffix = relative.suffix.casefold()
+    return (
+        suffix == ".md"
+        or (suffix == ".json" and relative.parts[:1] == ("registry",))
+        or relative.as_posix() in ALLOWED_RELEASE_PYTHON_PATHS
+    )
 
 
 def tracked_utf8_text_files(errors: list[str]) -> list[tuple[Path, str]]:
@@ -896,9 +969,9 @@ def quoted_fragments_cover_identifier(
 def quoted_fragment_language(path: Path) -> str | None:
     """Select only the escape semantics owned by the tracked file family."""
     suffix = path.suffix.casefold()
-    if suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}:
+    if suffix in JAVASCRIPT_SUFFIXES:
         return "javascript"
-    if suffix in {".ps1", ".psm1", ".psd1"}:
+    if suffix in POWERSHELL_SUFFIXES:
         return "powershell"
     return None
 
@@ -2404,6 +2477,26 @@ def python_literal_projections(
 def validate_access_url_policy(errors: list[str], narrative_only_root: str | None) -> None:
     if narrative_only_root is None:
         return
+    for allowed_path in (
+        Path("README.md"),
+        Path("ai/AI_PORTFOLIO_TOC.md"),
+        Path("registry/example.json"),
+        Path("scripts/validate_profile_package.py"),
+    ):
+        if not release_path_family_allowed(allowed_path):
+            fail(errors, f"release path-family allowlist regression: {allowed_path}")
+    for denied_path in (
+        Path("example.js"),
+        Path("example.tsx"),
+        Path("example.ps1"),
+        Path("example.py"),
+        Path("example.json"),
+        Path("LICENSE"),
+        Path("SCRIPTS/VALIDATE_PROFILE_PACKAGE.PY"),
+        Path("scripts/Validate_Profile_Package.py"),
+    ):
+        if release_path_family_allowed(denied_path):
+            fail(errors, f"release path-family deny regression: {denied_path}")
     public_root = "https://github.com/lowelltwong-alt/public-example"
     allowed_roots = {public_root, narrative_only_root} | STRUCTURED_PRIVATE_ACCESS_URLS
     repository_name = narrative_only_root.rsplit("/", 1)[-1]
@@ -3216,6 +3309,97 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             "JavaScript direct fromCharCode",
         ),
         (
+            "const candidate = String[\"fromCharCode\"]("
+            + private_code_text
+            + ");",
+            ".js",
+            "JavaScript bracket character constructor",
+        ),
+        (
+            "const constructor = String['fromCodePoint'];\n"
+            + "const candidate = constructor("
+            + private_code_text
+            + ");",
+            ".ts",
+            "JavaScript aliased bracket character constructor",
+        ),
+        (
+            "const {fromCharCode} = String;\n"
+            + "const candidate = fromCharCode("
+            + private_code_text
+            + ");",
+            ".js",
+            "JavaScript destructured character constructor",
+        ),
+        (
+            "const {fromCodePoint: make} = String;\n"
+            + "const candidate = make("
+            + private_code_text
+            + ");",
+            ".ts",
+            "JavaScript aliased destructured character constructor",
+        ),
+        (
+            "const {[\"fromCharCode\"]: make} = String;\n"
+            + "const candidate = make("
+            + private_code_text
+            + ");",
+            ".js",
+            "JavaScript double-quoted computed destructuring",
+        ),
+        (
+            "const {['fromCodePoint']: make} = String;\n"
+            + "const candidate = make("
+            + private_code_text
+            + ");",
+            ".ts",
+            "JavaScript single-quoted computed destructuring",
+        ),
+        (
+            "const {["
+            + template_delimiter
+            + "fromCharCode"
+            + template_delimiter
+            + "]: make} = String;\n"
+            + "const candidate = make("
+            + private_code_text
+            + ");",
+            ".js",
+            "JavaScript template-quoted computed destructuring",
+        ),
+        (
+            "const {\"fromCodePoint\": make} = String;\n"
+            + "const candidate = make("
+            + private_code_text
+            + ");",
+            ".js",
+            "JavaScript quoted-property destructuring",
+        ),
+        (
+            "const {"
+            + ("ordinary" * 600)
+            + ", fromCharCode} = String;\n"
+            + "const candidate = fromCharCode("
+            + private_code_text
+            + ");",
+            ".js",
+            "JavaScript over-bound destructuring",
+        ),
+        (
+            "const candidate = String?.fromCharCode("
+            + private_code_text
+            + ");",
+            ".js",
+            "JavaScript optional character constructor",
+        ),
+        (
+            "const candidate = String?.[\"fromCodePoint\"]("
+            + private_code_text
+            + ");",
+            ".js",
+            "JavaScript optional bracket character constructor",
+        ),
+        (
             "const candidate = "
             + template_delimiter
             + "${String.fromCharCode("
@@ -3401,6 +3585,26 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     static_language_controls = (
         ("const ordinary = String.fromCharCode(65, 66, 67);", ".js", "ordinary JavaScript characters"),
         (
+            "const ordinary = String['raw']({ raw: ['ordinary'] });",
+            ".js",
+            "ordinary JavaScript String bracket property",
+        ),
+        (
+            "const ordinary = String['fromcharcode'];",
+            ".js",
+            "JavaScript case-sensitive bracket property",
+        ),
+        (
+            "const ordinary = String.fromcharcode(" + private_code_text + ");",
+            ".js",
+            "JavaScript case-sensitive dotted property",
+        ),
+        (
+            "const {raw} = String;",
+            ".js",
+            "ordinary JavaScript String destructuring",
+        ),
+        (
             f"const altered = String.fromCharCode({altered_codes});",
             ".ts",
             "altered JavaScript route",
@@ -3409,6 +3613,23 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             f"// String.fromCharCode({private_code_text})",
             ".js",
             "JavaScript line comment",
+        ),
+        (
+            "// String[\"fromCharCode\"](" + private_code_text + ")",
+            ".js",
+            "JavaScript bracket-constructor comment",
+        ),
+        (
+            "// const {fromCharCode} = String; fromCharCode("
+            + private_code_text
+            + ")",
+            ".js",
+            "JavaScript destructuring comment",
+        ),
+        (
+            "// String?.[\"fromCodePoint\"](" + private_code_text + ")",
+            ".js",
+            "JavaScript optional-constructor comment",
         ),
         (
             "const documentation = "
@@ -3943,6 +4164,8 @@ def validate_release_text(
     meta_language_paths = {Path("scripts/validate_profile_package.py")}
     for path, text in tracked_texts:
         relative = path.relative_to(ROOT)
+        if not release_path_family_allowed(relative):
+            fail(errors, f"tracked file family is not allowed on the public profile surface: {relative}")
         is_meta_language = relative in meta_language_paths or relative.parts[:2] == ("registry", "schemas")
         normalized_text = normalize_privacy_text(text)
         urls = list(iter_owned_github_urls(text))
@@ -3958,10 +4181,9 @@ def validate_release_text(
             )
             if python_projections:
                 privacy_views.append(("\n".join(python_projections), False))
-        elif relative.suffix.lower() in {
-            ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts",
-            ".ps1", ".psm1", ".psd1",
-        }:
+        elif relative.suffix.lower() in JAVASCRIPT_SUFFIXES | POWERSHELL_SUFFIXES:
+            # These source families are denied above. Projection remains a
+            # defense-in-depth privacy check if that structural gate changes.
             language_projections = static_language_projections(text, relative, errors)
             if language_projections:
                 projected_values = [text]
