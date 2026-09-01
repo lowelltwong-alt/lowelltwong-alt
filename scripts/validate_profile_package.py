@@ -604,8 +604,93 @@ def python_literal_projections(
                     return chr(int(argument))
                 except (OverflowError, ValueError):
                     return None
-            if node.func.id == "ord" and isinstance(argument, (str, bytes)) and len(argument) == 1:
+            if (
+                node.func.id == "ord"
+                and isinstance(argument, (str, bytes))
+                and len(argument) == 1
+            ):
                 return ord(argument)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            attribute = node.func.attr
+            if (
+                attribute == "fromhex"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id in {"bytes", "bytearray"}
+                and len(node.args) == 1
+                and not node.keywords
+            ):
+                encoded = static_value(node.args[0], environment, depth + 1)
+                if isinstance(encoded, str):
+                    if len(encoded) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                        projection_failure("static hexadecimal input exceeds the bounded projection limit")
+                        return None
+                    try:
+                        decoded = bytes.fromhex(encoded)
+                    except ValueError:
+                        return None
+                    if len(decoded) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                        projection_failure("static hexadecimal output exceeds the bounded projection limit")
+                        return None
+                    return decoded
+            if attribute in {"decode", "encode"}:
+                receiver = static_value(node.func.value, environment, depth + 1)
+                receiver_matches = (
+                    attribute == "decode" and isinstance(receiver, bytes)
+                ) or (attribute == "encode" and isinstance(receiver, str))
+                if receiver_matches:
+                    if len(receiver) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                        projection_failure("static codec input exceeds the bounded projection limit")
+                        return None
+                    if len(node.args) > 2:
+                        projection_failure("static codec call has unsupported positional arguments")
+                        return None
+                    options: dict[str, str] = {"encoding": "utf-8", "errors": "strict"}
+                    option_names = ("encoding", "errors")
+                    explicit_options: set[str] = set()
+                    for index, argument_node in enumerate(node.args):
+                        option = static_value(argument_node, environment, depth + 1)
+                        if not isinstance(option, str):
+                            projection_failure("static codec call has an unresolved option")
+                            return None
+                        option_name = option_names[index]
+                        options[option_name] = option
+                        explicit_options.add(option_name)
+                    for keyword in node.keywords:
+                        if keyword.arg not in options:
+                            projection_failure("static codec call has an unsupported keyword")
+                            return None
+                        if keyword.arg in explicit_options:
+                            projection_failure("static codec call repeats an explicit option")
+                            return None
+                        option = static_value(keyword.value, environment, depth + 1)
+                        if not isinstance(option, str):
+                            projection_failure("static codec call has an unresolved option")
+                            return None
+                        options[keyword.arg] = option
+                        explicit_options.add(keyword.arg)
+                    encoding = options["encoding"].casefold().replace("_", "-")
+                    if encoding not in {
+                        "ascii",
+                        "iso-8859-1",
+                        "latin-1",
+                        "latin1",
+                        "utf-8",
+                        "utf8",
+                    } or options["errors"] != "strict":
+                        projection_failure("static codec call is outside the bounded codec policy")
+                        return None
+                    try:
+                        transformed = (
+                            receiver.decode(options["encoding"], options["errors"])
+                            if isinstance(receiver, bytes)
+                            else receiver.encode(options["encoding"], options["errors"])
+                        )
+                    except (LookupError, UnicodeError):
+                        return None
+                    if len(transformed) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                        projection_failure("static codec output exceeds the bounded projection limit")
+                        return None
+                    return transformed
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
@@ -1132,6 +1217,7 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     first_octal_half = "".join(octal_parts[:octal_split])
     second_octal_half = "".join(octal_parts[octal_split:])
     named_unicode_deep_url = private_deep_url.replace("-", r"\N{HYPHEN-MINUS}")
+    hexadecimal_deep_url = private_deep_url.encode("utf-8").hex()
     character_call_source = (
         'dash = chr(45)\n' + 'candidate = "'
         + private_deep_url.replace("-", '" + dash + "')
@@ -1308,6 +1394,14 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             "Python bitwise-invert tuple concatenation",
         ),
         (character_call_source, "Python static-character concatenation"),
+        (
+            f'candidate = bytes.fromhex("{hexadecimal_deep_url}").decode()',
+            "Python static hexadecimal bytes decoding",
+        ),
+        (
+            f'candidate = bytearray.fromhex("{hexadecimal_deep_url}").decode(encoding="utf-8")',
+            "Python static hexadecimal bytearray decoding",
+        ),
         (f'candidate = "{named_unicode_deep_url}"', "Python named-Unicode string"),
     )
     for source, label in python_literal_cases:
@@ -1419,6 +1513,44 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         python_literal_projections(source, Path("example.py"), character_errors)
         if character_errors:
             fail(errors, f"Python bounded character regression: {label}")
+
+    maximum_hexadecimal_input = bytes(
+        MAX_PYTHON_STATIC_PROJECTION_CHARS // 2
+    ).hex()
+    oversized_hexadecimal_input = bytes(
+        MAX_PYTHON_STATIC_PROJECTION_CHARS // 2 + 1
+    ).hex()
+    for source, expect_failure, label in (
+        ('candidate = bytes.fromhex("zz").decode()', False, "invalid hexadecimal input"),
+        (
+            'candidate = bytes.fromhex("'
+            + maximum_hexadecimal_input
+            + '")',
+            False,
+            "maximum hexadecimal input",
+        ),
+        (
+            'candidate = bytes.fromhex("'
+            + oversized_hexadecimal_input
+            + '")',
+            True,
+            "oversized hexadecimal input",
+        ),
+        (
+            'candidate = b"x".decode("utf-8", encoding="utf-8")',
+            True,
+            "duplicate codec encoding option",
+        ),
+        (
+            'candidate = b"x".decode("utf-8", "strict", errors="strict")',
+            True,
+            "duplicate codec errors option",
+        ),
+    ):
+        codec_errors: list[str] = []
+        python_literal_projections(source, Path("example.py"), codec_errors)
+        if bool(codec_errors) is not expect_failure:
+            fail(errors, f"Python bounded static-codec regression: {label}")
 
     unresolved_multiplier_source = (
         f'pair = ("{first_octal_half}", "{second_octal_half}") * (2 ** 0)\n'
