@@ -5,11 +5,15 @@ from __future__ import annotations
 
 import argparse
 import ast
+import base64
+import binascii
 import hashlib
 import json
 import re
+import string
 import subprocess
 import sys
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from html import unescape
 from pathlib import Path
@@ -59,6 +63,8 @@ SERIALIZED_CODEPOINT_ESCAPES = (
     re.compile(r"\\U([0-9A-Fa-f]{8})"),
 )
 SERIALIZED_NUMERIC_ESCAPE_PREFIX = re.compile(r"\\+(?=[xuU][0-9A-Fa-f])")
+SERIALIZED_NAMED_UNICODE_ESCAPE = re.compile(r"\\N\{([^{}]{1,256})\}")
+SERIALIZED_OCTAL_ESCAPE = re.compile(r"\\([0-7]{1,3})")
 YAML_ESCAPED_LINE_BREAK = re.compile(r"\\(?:\r\n?|\n)[ \t]*")
 
 
@@ -127,10 +133,26 @@ def normalize_release_text(text: str, *, markdown_escapes: bool = True) -> str:
                 ),
                 text,
             )
+        text = SERIALIZED_NAMED_UNICODE_ESCAPE.sub(
+            lambda match: _decode_named_unicode_escape(match),
+            text,
+        )
+        text = SERIALIZED_OCTAL_ESCAPE.sub(
+            lambda match: chr(int(match.group(1), 8)),
+            text,
+        )
         text = unescape(text)
         if markdown_escapes:
             text = MARKDOWN_BACKSLASH_ESCAPE.sub(r"\1", text)
     return text
+
+
+def _decode_named_unicode_escape(match: re.Match[str]) -> str:
+    """Decode one bounded Python-style named Unicode escape if it is valid."""
+    try:
+        return unicodedata.lookup(match.group(1))
+    except KeyError:
+        return match.group(0)
 
 
 def normalize_percent_escapes(text: str) -> str:
@@ -140,6 +162,38 @@ def normalize_percent_escapes(text: str) -> str:
         previous = text
         text = unquote(text)
     return text
+
+
+def normalize_privacy_text(text: str, *, markdown_escapes: bool = True) -> str:
+    """Alternate serializer and percent decoding until their joint fixed point."""
+    previous = None
+    while text != previous:
+        previous = text
+        text = normalize_release_text(text, markdown_escapes=markdown_escapes)
+        text = normalize_percent_escapes(text)
+    return text
+
+
+def privacy_normalization_closure(text: str) -> list[str]:
+    """Return the bounded fixed point of serializer and percent normalizers."""
+    pending = [text]
+    seen = {text}
+    while pending:
+        candidate = pending.pop()
+        for normalized in (
+            normalize_privacy_text(candidate),
+            normalize_privacy_text(candidate, markdown_escapes=False),
+        ):
+            if normalized in seen:
+                continue
+            if (
+                len(normalized) > MAX_PYTHON_STATIC_PROJECTION_CHARS
+                or len(seen) >= 64
+            ):
+                raise ValueError("privacy normalization exceeds its bounded closure")
+            seen.add(normalized)
+            pending.append(normalized)
+    return sorted(seen)
 
 
 def normalize_url_candidate(url: str) -> str:
@@ -187,8 +241,8 @@ def iter_owned_github_urls(text: str, *, normalize_serialized: bool = True):
     """Yield complete URL tokens that resolve to this GitHub account."""
     scan_texts = (
         (
-            normalize_release_text(text),
-            normalize_release_text(text, markdown_escapes=False),
+            normalize_privacy_text(text),
+            normalize_privacy_text(text, markdown_escapes=False),
         )
         if normalize_serialized
         else (text,)
@@ -292,8 +346,7 @@ def has_noncanonical_narrative_identifier(
     *,
     normalize_serialized: bool = True,
 ) -> bool:
-    release_text = normalize_release_text(text) if normalize_serialized else text
-    normalized_text = normalize_percent_escapes(release_text)
+    normalized_text = normalize_privacy_text(text) if normalize_serialized else text
     repository_name = unquote(urlsplit(narrative_only_root).path).rstrip("/").rsplit("/", 1)[-1]
     text_without_approved_root = normalized_text.replace(narrative_only_root, "")
     return repository_name.casefold() in text_without_approved_root.casefold()
@@ -306,7 +359,11 @@ def python_literal_projections(
     *,
     protected_identifier: str | None = None,
 ) -> list[str]:
-    """Return bounded Python-decoded static text without executing tracked source."""
+    """Return bounded decoded Python content without executing tracked source.
+
+    Serialized private-route payloads are release content even when unreachable.
+    This privacy rule intentionally does not attempt to prove Python execution.
+    """
     try:
         tree = ast.parse(source, filename=str(relative))
     except (SyntaxError, ValueError) as error:
@@ -455,6 +512,108 @@ def python_literal_projections(
                         reachable.add(next_position)
                         pending.append(next_position)
 
+    def add_serialized_payload_projections() -> None:
+        """Decode bounded printable serialization layers independent of reachability."""
+        if protected_identifier is None:
+            return
+        protected = protected_identifier.casefold()
+        literal_seeds = {
+            (
+                candidate.value.decode("latin-1")
+                if isinstance(candidate.value, bytes)
+                else candidate.value
+            )
+            for candidate in ast.walk(tree)
+            if isinstance(candidate, ast.Constant)
+            and isinstance(candidate.value, (str, bytes))
+        }
+        pending = [(candidate, 0) for candidate in projections | literal_seeds]
+        seen = {candidate for candidate, _ in pending}
+        generated_chars = sum(len(candidate) for candidate in seen)
+
+        def padded(value: bytes, multiple: int) -> bytes:
+            padding = -len(value) % multiple
+            return value.ljust(len(value) + padding, b"=")
+
+        while pending:
+            candidate, decode_depth = pending.pop()
+            if len(candidate) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                projection_failure(
+                    "serialized Python payload exceeds the bounded input limit"
+                )
+                return
+            try:
+                normalized_candidates = privacy_normalization_closure(candidate)
+            except ValueError:
+                projection_failure(
+                    "serialized Python payload exceeds the bounded normalization closure"
+                )
+                return
+            for normalized in normalized_candidates:
+                if protected in normalized.casefold():
+                    add_projection(normalized)
+                if normalized not in seen:
+                    seen.add(normalized)
+                    generated_chars += len(normalized)
+                    pending.append((normalized, decode_depth))
+            if decode_depth >= 4:
+                continue
+            for normalized in normalized_candidates:
+                try:
+                    encoded = normalized.encode("ascii")
+                except UnicodeEncodeError:
+                    continue
+                compact = re.sub(rb"[\t\n\r ]+", b"", encoded)
+                decoder_inputs = {encoded, compact}
+                for decoder_input in decoder_inputs:
+                    decoders = (
+                        lambda value: base64.a85decode(value),
+                        lambda value: base64.b16decode(value, casefold=True),
+                        lambda value: base64.b32decode(padded(value, 8), casefold=True),
+                        lambda value: base64.b32hexdecode(padded(value, 8), casefold=True),
+                        lambda value: base64.b64decode(padded(value, 4), validate=True),
+                        lambda value: base64.b85decode(value),
+                        lambda value: base64.b64decode(
+                            padded(value, 4),
+                            altchars=b"-_",
+                            validate=True,
+                        ),
+                    )
+                    for decoder in decoders:
+                        try:
+                            decoded = decoder(decoder_input)
+                        except (
+                            binascii.Error,
+                            OverflowError,
+                            TypeError,
+                            UnicodeError,
+                            ValueError,
+                        ):
+                            continue
+                        if (
+                            not decoded
+                            or len(decoded) > MAX_PYTHON_STATIC_PROJECTION_CHARS
+                            or not all(
+                                byte in {9, 10, 13} or 32 <= byte <= 126
+                                for byte in decoded
+                            )
+                        ):
+                            continue
+                        text = decoded.decode("ascii")
+                        if text in seen:
+                            continue
+                        seen.add(text)
+                        generated_chars += len(text)
+                        pending.append((text, decode_depth + 1))
+                        if (
+                            len(seen) > MAX_PYTHON_STATIC_SEQUENCE_ITEMS
+                            or generated_chars > MAX_PYTHON_STATIC_TOTAL_CHARS
+                        ):
+                            projection_failure(
+                                "serialized Python payloads exceed the bounded decode budget"
+                            )
+                            return
+
     def stored_text_size(environment: dict[str, object]) -> int:
         return sum(materialized_text_size(value) for value in environment.values())
 
@@ -483,45 +642,54 @@ def python_literal_projections(
             else:
                 environment[name] = previous
 
-    def static_formatted_text(
-        node: ast.FormattedValue,
-        environment: dict[str, object],
-        depth: int,
-    ) -> str | None:
-        value = static_value(node.value, environment, depth + 1)
-        if type(value) not in safe_scalar_types:
-            return None
-        if node.conversion == ord("s"):
-            value = str(value)
-        elif node.conversion == ord("r"):
-            value = repr(value)
-        elif node.conversion == ord("a"):
-            value = ascii(value)
-        elif node.conversion != -1:
-            return None
-        format_spec = (
-            ""
-            if node.format_spec is None
-            else static_value(node.format_spec, environment, depth + 1)
+    def static_format_text_allowed(format_text: str) -> bool:
+        return len(format_text) <= MAX_PYTHON_STATIC_PROJECTION_CHARS
+
+    def static_format_value_allowed(value: object) -> bool:
+        if type(value) in {int, bool}:
+            return int(value).bit_length() <= MAX_PYTHON_STATIC_PROJECTION_CHARS
+        if isinstance(value, tuple):
+            return (
+                materialized_text_size(value) <= MAX_PYTHON_STATIC_PROJECTION_CHARS
+                and all(static_format_value_allowed(item) for item in value)
+            )
+        return (
+            is_safe_materialized(value)
+            and materialized_text_size(value) <= MAX_PYTHON_STATIC_PROJECTION_CHARS
         )
-        if not isinstance(format_spec, str):
+
+    def static_render_field(
+        value: object,
+        format_spec: str,
+        conversion: str | None = None,
+    ) -> str | None:
+        """Render one bounded field before any aggregate string allocation."""
+        if not static_format_value_allowed(value):
+            projection_failure("static format value exceeds the bounded projection limit")
             return None
-
-        def exceeds_projection_bound(digits: str) -> bool:
-            significant = digits.lstrip("0") or "0"
-            maximum = str(MAX_PYTHON_STATIC_PROJECTION_CHARS)
-            return len(significant) > len(maximum) or (
-                len(significant) == len(maximum) and significant > maximum
-            )
-
         if (
-            len(format_spec) > MAX_PYTHON_STATIC_PROJECTION_CHARS
-            or any(
-                exceeds_projection_bound(digits)
-                for digits in re.findall(r"[0-9]+", format_spec)
-            )
+            not static_format_text_allowed(format_spec)
+            or "{" in format_spec
+            or "}" in format_spec
         ):
-            projection_failure("static format specification exceeds the bounded projection limit")
+            projection_failure("static format specification is outside the bounded policy")
+            return None
+        maximum = str(MAX_PYTHON_STATIC_PROJECTION_CHARS)
+        for digits in re.findall(r"[0-9]+", format_spec):
+            significant = digits.lstrip("0") or "0"
+            if len(significant) > len(maximum) or (
+                len(significant) == len(maximum) and significant > maximum
+            ):
+                projection_failure("static format width exceeds the bounded projection limit")
+                return None
+        if conversion == "s":
+            value = str(value)
+        elif conversion == "r":
+            value = repr(value)
+        elif conversion == "a":
+            value = ascii(value)
+        elif conversion is not None:
+            projection_failure("static format conversion is outside the bounded policy")
             return None
         try:
             rendered = format(value, format_spec)
@@ -534,6 +702,222 @@ def python_literal_projections(
             projection_failure("static formatted value exceeds the bounded projection limit")
             return None
         return rendered
+
+    def static_render_format(
+        template: str,
+        arguments: tuple[object, ...],
+        keyword_arguments: dict[str, object],
+        *,
+        format_map: bool = False,
+    ) -> str | None:
+        """Render simple static format fields with a cumulative preallocation bound."""
+        if not static_format_text_allowed(template):
+            projection_failure("static format template exceeds the bounded projection limit")
+            return None
+        try:
+            parsed_fields = list(string.Formatter().parse(template))
+        except ValueError:
+            return None
+        rendered_parts: list[str] = []
+        rendered_size = 0
+        automatic_index = 0
+        for literal, field_name, format_spec, conversion in parsed_fields:
+            rendered_size += len(literal)
+            if rendered_size > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                projection_failure("static format output exceeds the bounded projection limit")
+                return None
+            rendered_parts.append(literal)
+            if field_name is None:
+                continue
+            if format_map:
+                if not field_name.isidentifier() or field_name not in keyword_arguments:
+                    projection_failure("static format-map field is outside the bounded policy")
+                    return None
+                value = keyword_arguments[field_name]
+            elif field_name == "":
+                if automatic_index >= len(arguments):
+                    return None
+                value = arguments[automatic_index]
+                automatic_index += 1
+            elif field_name.isdecimal():
+                field_index = int(field_name)
+                if field_index >= len(arguments):
+                    return None
+                value = arguments[field_index]
+            elif field_name.isidentifier() and field_name in keyword_arguments:
+                value = keyword_arguments[field_name]
+            else:
+                projection_failure("static format field is outside the bounded policy")
+                return None
+            rendered_field = static_render_field(value, format_spec, conversion)
+            if rendered_field is None:
+                return None
+            rendered_size += len(rendered_field)
+            if rendered_size > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                projection_failure("static format output exceeds the bounded projection limit")
+                return None
+            rendered_parts.append(rendered_field)
+        return "".join(rendered_parts)
+
+    percent_field = re.compile(
+        r"%[#0\- +]*(?:[0-9]+)?(?:\.[0-9]+)?[hlL]?[diouxXeEfFgGcrsab]"
+    )
+
+    def static_render_percent(
+        template: str | bytes,
+        values: object,
+    ) -> str | bytes | None:
+        """Render bounded positional percent fields one at a time."""
+        template_text = template.decode("latin-1") if isinstance(template, bytes) else template
+        if not static_format_text_allowed(template_text):
+            projection_failure("static percent template exceeds the bounded projection limit")
+            return None
+        arguments = list(values) if isinstance(values, tuple) else [values]
+        argument_index = 0
+        rendered_parts: list[str | bytes] = []
+        rendered_size = 0
+        literal_start = 0
+        position = 0
+        while position < len(template_text):
+            if template_text[position] != "%":
+                position += 1
+                continue
+            literal = template_text[literal_start:position]
+            if literal:
+                literal_value = literal.encode("latin-1") if isinstance(template, bytes) else literal
+                rendered_parts.append(literal_value)
+                rendered_size += len(literal_value)
+            if position + 1 < len(template_text) and template_text[position + 1] == "%":
+                percent_value = b"%" if isinstance(template, bytes) else "%"
+                rendered_parts.append(percent_value)
+                rendered_size += 1
+                position += 2
+                literal_start = position
+                continue
+            match = percent_field.match(template_text, position)
+            if match is None or argument_index >= len(arguments):
+                projection_failure("static percent field is outside the bounded policy")
+                return None
+            specifier = match.group(0)
+            maximum = str(MAX_PYTHON_STATIC_PROJECTION_CHARS)
+            for digits in re.findall(r"[0-9]+", specifier):
+                significant = digits.lstrip("0") or "0"
+                if len(significant) > len(maximum) or (
+                    len(significant) == len(maximum) and significant > maximum
+                ):
+                    projection_failure("static percent width exceeds the bounded projection limit")
+                    return None
+            value = arguments[argument_index]
+            argument_index += 1
+            if not static_format_value_allowed(value):
+                projection_failure("static percent value exceeds the bounded projection limit")
+                return None
+            native_specifier = (
+                specifier.encode("latin-1") if isinstance(template, bytes) else specifier
+            )
+            try:
+                rendered_field = native_specifier % value
+            except MemoryError:
+                projection_failure("static percent format exhausted the bounded projection budget")
+                return None
+            except (OverflowError, TypeError, ValueError):
+                return None
+            rendered_size += len(rendered_field)
+            if rendered_size > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                projection_failure("static percent-format output exceeds the bounded projection limit")
+                return None
+            rendered_parts.append(rendered_field)
+            position = match.end()
+            literal_start = position
+        trailing = template_text[literal_start:]
+        if trailing:
+            trailing_value = trailing.encode("latin-1") if isinstance(template, bytes) else trailing
+            rendered_parts.append(trailing_value)
+            rendered_size += len(trailing_value)
+        if rendered_size > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+            projection_failure("static percent-format output exceeds the bounded projection limit")
+            return None
+        if argument_index != len(arguments):
+            return None
+        return (b"" if isinstance(template, bytes) else "").join(rendered_parts)
+
+    def static_formatted_text(
+        node: ast.FormattedValue,
+        environment: dict[str, object],
+        depth: int,
+    ) -> str | None:
+        value = static_value(node.value, environment, depth + 1)
+        if type(value) not in safe_scalar_types:
+            return None
+        format_spec = (
+            ""
+            if node.format_spec is None
+            else static_value(node.format_spec, environment, depth + 1)
+        )
+        if not isinstance(format_spec, str):
+            return None
+        conversion = None if node.conversion == -1 else chr(node.conversion)
+        return static_render_field(value, format_spec, conversion)
+
+    def static_comprehension_sequence(
+        node: ast.GeneratorExp | ast.ListComp,
+        environment: dict[str, object],
+        depth: int,
+    ) -> tuple[object, ...] | None:
+        """Materialize bounded deterministic comprehensions used by static joins."""
+        results: list[object] = []
+        result_chars = 0
+
+        def expand(generator_index: int, current: dict[str, object]) -> bool:
+            nonlocal result_chars
+            if generator_index == len(node.generators):
+                value = static_value(node.elt, current, depth + generator_index + 1)
+                if not is_safe_materialized(value):
+                    return False
+                if len(results) >= MAX_PYTHON_STATIC_SEQUENCE_ITEMS:
+                    projection_failure("static comprehension exceeds the bounded item limit")
+                    return False
+                result_chars += materialized_text_size(value)
+                if result_chars > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                    projection_failure("static comprehension exceeds the bounded projection limit")
+                    return False
+                results.append(value)
+                return True
+            generator = node.generators[generator_index]
+            if generator.is_async:
+                projection_failure("asynchronous static comprehension is outside the bounded policy")
+                return False
+            iterable = static_value(
+                generator.iter,
+                current,
+                depth + generator_index + 1,
+            )
+            if not isinstance(iterable, tuple):
+                return False
+            for item in iterable:
+                item_environment = dict(current)
+                bind_assignment_target(item_environment, generator.target, item)
+                if not target_names(generator.target) <= set(item_environment):
+                    return False
+                include = True
+                for condition_node in generator.ifs:
+                    condition = static_value(
+                        condition_node,
+                        item_environment,
+                        depth + generator_index + 1,
+                    )
+                    if type(condition) not in safe_scalar_types:
+                        return False
+                    if not bool(condition):
+                        include = False
+                        break
+                if include and not expand(generator_index + 1, item_environment):
+                    return False
+            return True
+
+        if not expand(0, dict(environment)):
+            return None
+        return tuple(results)
 
     def static_value(
         node: ast.AST,
@@ -563,6 +947,8 @@ def python_literal_projections(
             if all(is_safe_materialized(value) for value in values):
                 return values
             return None
+        if isinstance(node, (ast.GeneratorExp, ast.ListComp)):
+            return static_comprehension_sequence(node, environment, depth + 1)
         if isinstance(node, ast.Name):
             return environment.get(node.id)
         if isinstance(node, ast.UnaryOp):
@@ -578,20 +964,74 @@ def python_literal_projections(
                 if isinstance(node.op, ast.Invert):
                     return ~normalized
             return None
+        if isinstance(node, ast.BoolOp):
+            if not node.values:
+                return None
+            last_value: object | None = None
+            for value_node in node.values:
+                last_value = static_value(value_node, environment, depth + 1)
+                if type(last_value) not in safe_scalar_types:
+                    return None
+                if isinstance(node.op, ast.And) and not bool(last_value):
+                    return last_value
+                if isinstance(node.op, ast.Or) and bool(last_value):
+                    return last_value
+            return last_value
+        if isinstance(node, ast.Compare):
+            left = static_value(node.left, environment, depth + 1)
+            if not is_safe_materialized(left):
+                return None
+            for operator, comparator_node in zip(node.ops, node.comparators):
+                right = static_value(comparator_node, environment, depth + 1)
+                if not is_safe_materialized(right):
+                    return None
+                try:
+                    if isinstance(operator, ast.Eq):
+                        matched = left == right
+                    elif isinstance(operator, ast.NotEq):
+                        matched = left != right
+                    elif isinstance(operator, ast.Lt):
+                        matched = left < right
+                    elif isinstance(operator, ast.LtE):
+                        matched = left <= right
+                    elif isinstance(operator, ast.Gt):
+                        matched = left > right
+                    elif isinstance(operator, ast.GtE):
+                        matched = left >= right
+                    elif isinstance(operator, ast.In):
+                        matched = left in right
+                    elif isinstance(operator, ast.NotIn):
+                        matched = left not in right
+                    elif isinstance(operator, ast.Is):
+                        matched = left is right
+                    elif isinstance(operator, ast.IsNot):
+                        matched = left is not right
+                    else:
+                        return None
+                except (TypeError, ValueError):
+                    return None
+                if not matched:
+                    return False
+                left = right
+            return True
         if isinstance(node, ast.JoinedStr):
-            values = [
-                (static_formatted_text(value, environment, depth + 1) or "")
-                if isinstance(value, ast.FormattedValue)
-                else static_value(value, environment, depth + 1)
-                for value in node.values
-            ]
-            if values and all(isinstance(value, str) for value in values):
-                joined = "".join(value for value in values if isinstance(value, str))
-                if len(joined) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+            values: list[str] = []
+            joined_size = 0
+            for item in node.values:
+                if isinstance(item, ast.FormattedValue):
+                    value = static_formatted_text(item, environment, depth + 1)
+                    if value is None:
+                        value = ""
+                else:
+                    value = static_value(item, environment, depth + 1)
+                if not isinstance(value, str):
+                    return None
+                joined_size += len(value)
+                if joined_size > MAX_PYTHON_STATIC_PROJECTION_CHARS:
                     projection_failure("static f-string exceeds the bounded projection limit")
                     return None
-                return joined
-            return None
+                values.append(value)
+            return "".join(values)
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
@@ -691,6 +1131,94 @@ def python_literal_projections(
                         projection_failure("static codec output exceeds the bounded projection limit")
                         return None
                     return transformed
+            receiver = static_value(node.func.value, environment, depth + 1)
+            if attribute == "format" and isinstance(receiver, str):
+                arguments = tuple(
+                    static_value(argument, environment, depth + 1)
+                    for argument in node.args
+                )
+                keyword_arguments = {
+                    keyword.arg: static_value(keyword.value, environment, depth + 1)
+                    for keyword in node.keywords
+                    if keyword.arg is not None
+                }
+                if (
+                    len(keyword_arguments) != len(node.keywords)
+                ):
+                    projection_failure("static format keyword expansion is outside the bounded policy")
+                    return None
+                return static_render_format(
+                    receiver,
+                    arguments,
+                    keyword_arguments,
+                )
+            if (
+                attribute == "format_map"
+                and isinstance(receiver, str)
+                and len(node.args) == 1
+                and not node.keywords
+                and isinstance(node.args[0], ast.Dict)
+                and not any(key is None for key in node.args[0].keys)
+            ):
+                mapping: dict[str, object] = {}
+                for key_node, value_node in zip(
+                    node.args[0].keys,
+                    node.args[0].values,
+                ):
+                    key = static_value(key_node, environment, depth + 1)
+                    value = static_value(value_node, environment, depth + 1)
+                    if not isinstance(key, str):
+                        projection_failure("static format-map key is outside the bounded policy")
+                        return None
+                    mapping[key] = value
+                return static_render_format(
+                    receiver,
+                    (),
+                    mapping,
+                    format_map=True,
+                )
+            if attribute == "replace" and isinstance(receiver, (str, bytes)):
+                if len(node.args) not in {2, 3} or node.keywords:
+                    return None
+                old = static_value(node.args[0], environment, depth + 1)
+                new = static_value(node.args[1], environment, depth + 1)
+                count = (
+                    -1
+                    if len(node.args) == 2
+                    else static_value(node.args[2], environment, depth + 1)
+                )
+                if len(node.args) == 3 and count is None:
+                    projection_failure("static replacement count is unresolved")
+                    return None
+                if (
+                    type(old) is not type(receiver)
+                    or type(new) is not type(receiver)
+                    or type(count) not in {int, bool}
+                ):
+                    return None
+                count = int(count)
+                replacements = receiver.count(old)
+                if old == receiver[:0]:
+                    replacements = len(receiver) + 1
+                if count >= 0:
+                    replacements = min(replacements, count)
+                output_size = len(receiver) + replacements * (len(new) - len(old))
+                if output_size > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                    projection_failure("static replacement output exceeds the bounded projection limit")
+                    return None
+                return receiver.replace(old, new, count)
+            if attribute == "__add__" and len(node.args) == 1 and not node.keywords:
+                other = static_value(node.args[0], environment, depth + 1)
+                if isinstance(receiver, str) and isinstance(other, str):
+                    combined = receiver + other
+                elif isinstance(receiver, bytes) and isinstance(other, bytes):
+                    combined = receiver + other
+                else:
+                    return None
+                if len(combined) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                    projection_failure("static direct-add output exceeds the bounded projection limit")
+                    return None
+                return combined
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
@@ -721,6 +1249,89 @@ def python_literal_projections(
                     return None
                 return separator.join(values)
             return None
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
+            template = static_value(node.left, environment, depth + 1)
+            values = static_value(node.right, environment, depth + 1)
+            if isinstance(template, (str, bytes)):
+                return static_render_percent(template, values)
+        if isinstance(node, ast.BinOp) and isinstance(
+            node.op,
+            (
+                ast.Sub,
+                ast.Mult,
+                ast.FloorDiv,
+                ast.Mod,
+                ast.Pow,
+                ast.LShift,
+                ast.RShift,
+                ast.BitOr,
+                ast.BitXor,
+                ast.BitAnd,
+            ),
+        ):
+            left = static_value(node.left, environment, depth + 1)
+            right = static_value(node.right, environment, depth + 1)
+            if type(left) in {int, bool} and type(right) in {int, bool}:
+                left_integer = int(left)
+                right_integer = int(right)
+                if isinstance(node.op, ast.Pow):
+                    if right_integer < 0:
+                        return None
+                    estimated_bits = (
+                        1
+                        if left_integer in {-1, 0, 1}
+                        else max(abs(left_integer).bit_length(), 1) * right_integer
+                    )
+                    if estimated_bits > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                        projection_failure("static integer power exceeds the bounded projection limit")
+                        return None
+                if isinstance(node.op, (ast.LShift, ast.RShift)):
+                    if right_integer < 0:
+                        return None
+                    if (
+                        right_integer > MAX_PYTHON_STATIC_PROJECTION_CHARS
+                        or (
+                            isinstance(node.op, ast.LShift)
+                            and abs(left_integer).bit_length() + right_integer
+                            > MAX_PYTHON_STATIC_PROJECTION_CHARS
+                        )
+                    ):
+                        projection_failure("static integer shift exceeds the bounded projection limit")
+                        return None
+                try:
+                    if isinstance(node.op, ast.Sub):
+                        result = left_integer - right_integer
+                    elif isinstance(node.op, ast.Mult):
+                        if (
+                            abs(left_integer).bit_length()
+                            + abs(right_integer).bit_length()
+                            > MAX_PYTHON_STATIC_PROJECTION_CHARS + 1
+                        ):
+                            projection_failure("static integer multiplication exceeds the bounded projection limit")
+                            return None
+                        result = left_integer * right_integer
+                    elif isinstance(node.op, ast.FloorDiv):
+                        result = left_integer // right_integer
+                    elif isinstance(node.op, ast.Mod):
+                        result = left_integer % right_integer
+                    elif isinstance(node.op, ast.Pow):
+                        result = left_integer ** right_integer
+                    elif isinstance(node.op, ast.LShift):
+                        result = left_integer << right_integer
+                    elif isinstance(node.op, ast.RShift):
+                        result = left_integer >> right_integer
+                    elif isinstance(node.op, ast.BitOr):
+                        result = left_integer | right_integer
+                    elif isinstance(node.op, ast.BitXor):
+                        result = left_integer ^ right_integer
+                    else:
+                        result = left_integer & right_integer
+                except (OverflowError, ZeroDivisionError):
+                    return None
+                if abs(result).bit_length() > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                    projection_failure("static integer result exceeds the bounded projection limit")
+                    return None
+                return result
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
             left = static_value(node.left, environment, depth + 1)
             right = static_value(node.right, environment, depth + 1)
@@ -1066,6 +1677,7 @@ def python_literal_projections(
 
     analyze_block(tree.body, {})
     add_protected_literal_fragment_projection()
+    add_serialized_payload_projections()
     return sorted(projections)
 
 
@@ -1181,8 +1793,7 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     )
     for relative, url, expected, label in cases:
         extracted = list(iter_owned_github_urls(f"prefix {url} suffix"))
-        normalized_url = normalize_release_text(url)
-        if extracted != [normalized_url]:
+        if len(extracted) != 1:
             fail(errors, f"access URL extraction regression: {label}")
         elif release_url_allowed(relative, extracted[0], allowed_roots, narrative_only_root) is not expected:
             fail(errors, f"access URL policy regression: {label}")
@@ -1218,6 +1829,37 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     second_octal_half = "".join(octal_parts[octal_split:])
     named_unicode_deep_url = private_deep_url.replace("-", r"\N{HYPHEN-MINUS}")
     hexadecimal_deep_url = private_deep_url.encode("utf-8").hex()
+    private_deep_bytes = private_deep_url.encode("utf-8")
+    serialized_private_payloads = {
+        "Ascii85": base64.a85encode(private_deep_bytes).decode("ascii"),
+        "Base16": base64.b16encode(private_deep_bytes).decode("ascii"),
+        "Base32": base64.b32encode(private_deep_bytes).decode("ascii"),
+        "Base32hex": base64.b32hexencode(private_deep_bytes).decode("ascii"),
+        "Base64": base64.b64encode(private_deep_bytes).decode("ascii"),
+        "Base85": base64.b85encode(private_deep_bytes).decode("ascii"),
+        "URL-safe Base64": base64.urlsafe_b64encode(private_deep_bytes).decode("ascii"),
+        "nested Base64": base64.b64encode(
+            base64.b64encode(private_deep_bytes)
+        ).decode("ascii"),
+        "HTML-normalized Base64": base64.b64encode(
+            html_encoded_deep_url.encode("utf-8")
+        ).decode("ascii"),
+        "Unicode-normalized Base64": base64.b64encode(
+            unicode_encoded_deep_url.encode("utf-8")
+        ).decode("ascii"),
+        "Markdown-normalized Base64": base64.b64encode(
+            backslash_escaped_deep_url.encode("utf-8")
+        ).decode("ascii"),
+        "line-continuation Base64": base64.b64encode(
+            yaml_line_continued_deep_url.encode("utf-8")
+        ).decode("ascii"),
+        "percent-normalized Base64": base64.b64encode(
+            private_deep_url.replace("-", "%2D").encode("utf-8")
+        ).decode("ascii"),
+        "nested-percent Base64": base64.b64encode(
+            private_deep_url.replace("-", "%252D").encode("utf-8")
+        ).decode("ascii"),
+    }
     character_call_source = (
         'dash = chr(45)\n' + 'candidate = "'
         + private_deep_url.replace("-", '" + dash + "')
@@ -1410,6 +2052,314 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         if parse_errors or private_deep_url not in projections:
             fail(errors, f"Python literal privacy projection regression: {label}")
 
+    for label, payload in serialized_private_payloads.items():
+        serialized_errors: list[str] = []
+        serialized_projections = python_literal_projections(
+            "if False:\n    payload = " + json.dumps(payload),
+            Path("example.py"),
+            serialized_errors,
+            protected_identifier=repository_name,
+        )
+        if serialized_errors or private_deep_url not in serialized_projections:
+            fail(
+                errors,
+                f"Python serialized-content privacy regression: {label}",
+            )
+    aliased_base64_source = (
+        "import base64 as codec\n"
+        + "candidate = codec.b64decode("
+        + json.dumps(serialized_private_payloads["Base64"])
+        + ").decode()"
+    )
+    aliased_base64_errors: list[str] = []
+    aliased_base64_projections = python_literal_projections(
+        aliased_base64_source,
+        Path("example.py"),
+        aliased_base64_errors,
+        protected_identifier=repository_name,
+    )
+    if aliased_base64_errors or private_deep_url not in aliased_base64_projections:
+        fail(errors, "Python serialized-content alias regression")
+
+    base64_payload = serialized_private_payloads["Base64"]
+    payload_split = len(base64_payload) // 2
+    payload_first = base64_payload[:payload_split]
+    payload_second = base64_payload[payload_split:]
+    serialized_composition_cases = (
+        (
+            f'first = {json.dumps(payload_first)}\n'
+            + f'second = {json.dumps(payload_second)}\n'
+            + 'candidate = "{}{}".format(first, second)',
+            "string format",
+        ),
+        (
+            f'first = {json.dumps(payload_first)}\n'
+            + f'second = {json.dumps(payload_second)}\n'
+            + 'candidate = "{}{}".format(first, second, "unused")',
+            "string format with unused argument",
+        ),
+        (
+            f'first = {json.dumps(payload_first)}\n'
+            + f'second = {json.dumps(payload_second)}\n'
+            + 'candidate = "%s%s" % (first, second)',
+            "percent format",
+        ),
+        (
+            'candidate = "{left}{right}".format_map('
+            + '{"left": '
+            + json.dumps(payload_first)
+            + ', "right": '
+            + json.dumps(payload_second)
+            + '})',
+            "format map",
+        ),
+        (
+            f'parts = ({json.dumps(payload_first)}, {json.dumps(payload_second)})\n'
+            + 'candidate = "".join(item for item in parts)',
+            "generator join",
+        ),
+        (
+            'candidate = '
+            + json.dumps(payload_first + "~" + payload_second)
+            + '.replace("~", "")',
+            "string replacement",
+        ),
+    )
+    for source, label in serialized_composition_cases:
+        composition_errors: list[str] = []
+        composition_projections = python_literal_projections(
+            source,
+            Path("example.py"),
+            composition_errors,
+            protected_identifier=repository_name,
+        )
+        if composition_errors or private_deep_url not in composition_projections:
+            fail(
+                errors,
+                f"Python serialized-content composition regression: {label}",
+            )
+
+    for source, label in (
+        (
+            "match runtime_value:\n    case "
+            + json.dumps(base64_payload)
+            + ":\n        pass",
+            "value pattern",
+        ),
+        (
+            "match runtime_value:\n    case {"
+            + json.dumps(base64_payload)
+            + ": _}:\n        pass",
+            "mapping-key pattern",
+        ),
+    ):
+        pattern_errors: list[str] = []
+        pattern_projections = python_literal_projections(
+            source,
+            Path("example.py"),
+            pattern_errors,
+            protected_identifier=repository_name,
+        )
+        if pattern_errors or private_deep_url not in pattern_projections:
+            fail(errors, f"Python serialized-content match regression: {label}")
+
+    normalized_inner_base64 = base64_payload.replace(
+        base64_payload[0],
+        f"&#{ord(base64_payload[0])};",
+        1,
+    )
+    mixed_serialized_payloads = {
+        "percent then HTML": private_deep_url.replace("-", "%26%2345%3B"),
+        "percent then Unicode": private_deep_url.replace("-", r"%5Cu002d"),
+        "percent then Markdown": private_deep_url.replace("-", r"%5C-"),
+        "named Unicode": private_deep_url.replace("-", r"\N{HYPHEN-MINUS}"),
+        "octal": private_deep_url.replace("-", r"\055"),
+        "normalized intermediate Base64": normalized_inner_base64,
+    }
+    for label, serialized_text in mixed_serialized_payloads.items():
+        payload = base64.b64encode(serialized_text.encode("utf-8")).decode("ascii")
+        mixed_errors: list[str] = []
+        mixed_projections = python_literal_projections(
+            "if False:\n    payload = " + json.dumps(payload),
+            Path("example.py"),
+            mixed_errors,
+            protected_identifier=repository_name,
+        )
+        if mixed_errors or private_deep_url not in mixed_projections:
+            fail(errors, f"Python serialized normalization-closure regression: {label}")
+
+    serialized_comprehension_cases = (
+        (
+            f'parts = ({json.dumps(payload_first)}, {json.dumps(payload_second)})\n'
+            + 'candidate = "".join(item for item in parts if True)',
+            "filtered generator",
+        ),
+        (
+            f'parts = ({json.dumps(payload_first)}, {json.dumps(payload_second)})\n'
+            + 'candidate = "".join(item for item in parts if item != "")',
+            "comparison-filtered generator",
+        ),
+        (
+            f'parts = ({json.dumps(payload_first)}, {json.dumps(payload_second)})\n'
+            + 'candidate = "".join(item for item in parts if True and item)',
+            "boolean-filtered generator",
+        ),
+        (
+            'parts = (('
+            + json.dumps(payload_first)
+            + ',), ('
+            + json.dumps(payload_second)
+            + ',))\n'
+            + 'candidate = "".join(item for group in parts for item in group)',
+            "nested generator",
+        ),
+        (
+            'parts = (('
+            + json.dumps(payload_first)
+            + ',), ('
+            + json.dumps(payload_second)
+            + ',))\n'
+            + 'candidate = "".join(item for (item,) in parts)',
+            "tuple-destructuring generator",
+        ),
+        (
+            f'parts = ({json.dumps(payload_first)}, {json.dumps(payload_second)})\n'
+            + 'candidate = "".join([item for item in parts])',
+            "list comprehension",
+        ),
+        (
+            f'parts = ({json.dumps(payload_first)}, {json.dumps(payload_second)})\n'
+            + 'candidate = "".join([item for item in parts if item != ""])',
+            "comparison-filtered list comprehension",
+        ),
+        (
+            'candidate = '
+            + json.dumps(payload_first + "~" + payload_second)
+            + '.replace("~", "", True)',
+            "boolean replacement count",
+        ),
+        (
+            'candidate = '
+            + json.dumps(payload_first + "~" + payload_second)
+            + '.replace("~", "", 2 ** 0)',
+            "power replacement count",
+        ),
+        (
+            'candidate = '
+            + json.dumps(payload_first + "~" + payload_second)
+            + '.replace("~", "", 3 // 2)',
+            "floor-division replacement count",
+        ),
+        (
+            'candidate = '
+            + json.dumps(payload_first + "~" + payload_second)
+            + '.replace("~", "", 1 | 0)',
+            "bitwise replacement count",
+        ),
+    )
+    for source, label in serialized_comprehension_cases:
+        comprehension_errors: list[str] = []
+        comprehension_projections = python_literal_projections(
+            source,
+            Path("example.py"),
+            comprehension_errors,
+            protected_identifier=repository_name,
+        )
+        if comprehension_errors or private_deep_url not in comprehension_projections:
+            fail(errors, f"Python serialized comprehension regression: {label}")
+
+    private_hexadecimal_integer = int(private_deep_bytes.hex(), 16)
+    for source, label in (
+        (
+            f'candidate = "{{:X}}".format({private_hexadecimal_integer})',
+            "integer string format",
+        ),
+        (
+            f'candidate = "%X" % {private_hexadecimal_integer}',
+            "integer percent format",
+        ),
+    ):
+        integer_format_errors: list[str] = []
+        integer_format_projections = python_literal_projections(
+            source,
+            Path("example.py"),
+            integer_format_errors,
+            protected_identifier=repository_name,
+        )
+        if integer_format_errors or private_deep_url not in integer_format_projections:
+            fail(errors, f"Python serialized integer-format regression: {label}")
+
+    for source, label in (
+        ('candidate = "reference 9999999".format()', "literal digits in format"),
+        (
+            'candidate = "reference 9999999".format_map({})',
+            "literal digits in format map",
+        ),
+    ):
+        benign_format_errors: list[str] = []
+        benign_format_projections = python_literal_projections(
+            source,
+            Path("example.py"),
+            benign_format_errors,
+            protected_identifier=repository_name,
+        )
+        if benign_format_errors or "reference 9999999" not in benign_format_projections:
+            fail(errors, f"Python bounded benign-format regression: {label}")
+
+    for source, label in (
+        (
+            'candidate = "ordinary".format(runtime_value)',
+            "unused unresolved positional argument without fields",
+        ),
+        (
+            'candidate = "{}".format("ordinary", runtime_value)',
+            "unused unresolved automatic positional argument",
+        ),
+        (
+            'candidate = "{0}".format("ordinary", runtime_value)',
+            "unused unresolved manual positional argument",
+        ),
+        (
+            'candidate = "{value}".format(value="ordinary", unused=runtime_value)',
+            "unused unresolved keyword argument",
+        ),
+        (
+            'candidate = "{value}".format_map('
+            + '{"value": "ordinary", "unused": runtime_value})',
+            "unused unresolved format-map entry",
+        ),
+    ):
+        unused_format_errors: list[str] = []
+        unused_format_projections = python_literal_projections(
+            source,
+            Path("example.py"),
+            unused_format_errors,
+            protected_identifier=repository_name,
+        )
+        if unused_format_errors or "ordinary" not in unused_format_projections:
+            fail(errors, f"Python unused-format-argument regression: {label}")
+
+    for source, label in (
+        (
+            f'candidate = "{{0}}{{0}}".format("x" * {MAX_PYTHON_STATIC_PROJECTION_CHARS})',
+            "aggregate string format",
+        ),
+        (
+            f'candidate = "%s%s" % (("x" * {MAX_PYTHON_STATIC_PROJECTION_CHARS}), '
+            + f'("x" * {MAX_PYTHON_STATIC_PROJECTION_CHARS}))',
+            "aggregate percent format",
+        ),
+    ):
+        bounded_format_errors: list[str] = []
+        python_literal_projections(
+            source,
+            Path("example.py"),
+            bounded_format_errors,
+            protected_identifier=repository_name,
+        )
+        if not bounded_format_errors:
+            fail(errors, f"Python bounded format-preallocation regression: {label}")
+
     protected_split = 6
     protected_first = repository_name[:protected_split]
     protected_rest = repository_name[protected_split:]
@@ -1486,7 +2436,7 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         errors,
         protected_identifier=repository_name,
     )
-    if repository_name in raw_fragment_projections:
+    if repository_name not in raw_fragment_projections:
         fail(errors, "Python raw literal component-projection regression")
     if not has_noncanonical_narrative_identifier(
         raw_fragment_source,
@@ -1812,7 +2762,7 @@ def validate_release_text(
     for path, text in tracked_texts:
         relative = path.relative_to(ROOT)
         is_meta_language = relative in meta_language_paths or relative.parts[:2] == ("registry", "schemas")
-        normalized_text = normalize_release_text(text)
+        normalized_text = normalize_privacy_text(text)
         urls = list(iter_owned_github_urls(text))
         # The raw-source view is intentionally conservative: serialized private
         # identifiers remain prohibited even when they occur inside Python raw literals.
@@ -1828,7 +2778,7 @@ def validate_release_text(
                 privacy_views.append(("\n".join(python_projections), False))
         for privacy_text, normalize_serialized in privacy_views:
             normalized_privacy_text = (
-                normalize_release_text(privacy_text)
+                normalize_privacy_text(privacy_text)
                 if normalize_serialized
                 else privacy_text
             )
