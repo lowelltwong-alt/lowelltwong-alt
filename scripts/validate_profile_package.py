@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import re
@@ -43,6 +44,7 @@ DAD_URL = "https://github.com/lowelltwong-alt/Digital-Assett-Directory"
 STRUCTURED_PRIVATE_ACCESS_URLS = {DAD_URL}
 NARRATIVE_ONLY_ACCESS_URL_SHA256 = "4cf7299d0f996d643bbfda870e401a52c1f69c6881b57a729e5005dad0535f05"
 GITHUB_OWNER = "lowelltwong-alt"
+MAX_PYTHON_STATIC_PROJECTION_CHARS = 65_536
 URL_CANDIDATE_PATTERN = re.compile(
     r"(?i)(?=((?:https?:|[\\/]{2})[^\s<>\[\]()\"'`]+))"
 )
@@ -177,11 +179,15 @@ def owned_github_url_parts(url: str) -> tuple[SplitResult, list[str], bool] | No
     return parsed, normalized_segments, had_dot_segment
 
 
-def iter_owned_github_urls(text: str):
+def iter_owned_github_urls(text: str, *, normalize_serialized: bool = True):
     """Yield complete URL tokens that resolve to this GitHub account."""
     scan_texts = (
-        normalize_release_text(text),
-        normalize_release_text(text, markdown_escapes=False),
+        (
+            normalize_release_text(text),
+            normalize_release_text(text, markdown_escapes=False),
+        )
+        if normalize_serialized
+        else (text,)
     )
     seen_candidates: set[tuple[str, str, tuple[str, ...], str, str, bool]] = set()
     for scan_text in scan_texts:
@@ -270,11 +276,143 @@ def release_url_allowed(
     return True
 
 
-def has_noncanonical_narrative_identifier(text: str, narrative_only_root: str) -> bool:
-    normalized_text = normalize_percent_escapes(normalize_release_text(text))
+def has_noncanonical_narrative_identifier(
+    text: str,
+    narrative_only_root: str,
+    *,
+    normalize_serialized: bool = True,
+) -> bool:
+    release_text = normalize_release_text(text) if normalize_serialized else text
+    normalized_text = normalize_percent_escapes(release_text)
     repository_name = unquote(urlsplit(narrative_only_root).path).rstrip("/").rsplit("/", 1)[-1]
     text_without_approved_root = normalized_text.replace(narrative_only_root, "")
     return repository_name.casefold() in text_without_approved_root.casefold()
+
+
+def python_literal_projections(
+    source: str,
+    relative: Path,
+    errors: list[str],
+) -> list[str]:
+    """Return Python-decoded static text without executing tracked source."""
+    try:
+        tree = ast.parse(source, filename=str(relative))
+    except (SyntaxError, ValueError) as error:
+        fail(errors, f"tracked Python source cannot be parsed for privacy checks: {relative}: {error}")
+        return []
+
+    safe_scalar_types = {
+        str,
+        bytes,
+        int,
+        float,
+        complex,
+        bool,
+    }
+
+    def projection_failure(message: str) -> None:
+        full_message = f"tracked Python privacy projection failed: {relative}: {message}"
+        if full_message not in errors:
+            fail(errors, full_message)
+
+    def static_formatted_text(node: ast.FormattedValue) -> str | None:
+        value = static_value(node.value)
+        if type(value) not in safe_scalar_types:
+            return None
+        if node.conversion == ord("s"):
+            value = str(value)
+        elif node.conversion == ord("r"):
+            value = repr(value)
+        elif node.conversion == ord("a"):
+            value = ascii(value)
+        elif node.conversion != -1:
+            return None
+        format_spec = "" if node.format_spec is None else static_value(node.format_spec)
+        if not isinstance(format_spec, str):
+            return None
+
+        def exceeds_projection_bound(digits: str) -> bool:
+            significant = digits.lstrip("0") or "0"
+            maximum = str(MAX_PYTHON_STATIC_PROJECTION_CHARS)
+            return len(significant) > len(maximum) or (
+                len(significant) == len(maximum) and significant > maximum
+            )
+
+        if (
+            len(format_spec) > MAX_PYTHON_STATIC_PROJECTION_CHARS
+            or any(
+                exceeds_projection_bound(digits)
+                for digits in re.findall(r"[0-9]+", format_spec)
+            )
+        ):
+            projection_failure("static format specification exceeds the bounded projection limit")
+            return None
+        try:
+            rendered = format(value, format_spec)
+        except MemoryError:
+            projection_failure("static formatting exhausted the bounded projection budget")
+            return None
+        except (TypeError, ValueError):
+            return None
+        if len(rendered) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+            projection_failure("static formatted value exceeds the bounded projection limit")
+            return None
+        return rendered
+
+    def static_value(
+        node: ast.AST,
+    ) -> str | bytes | int | float | complex | bool | None:
+        if isinstance(node, ast.Constant) and type(node.value) in {
+            str,
+            bytes,
+            int,
+            float,
+            complex,
+            bool,
+        }:
+            return node.value
+        if isinstance(node, ast.JoinedStr):
+            values = [
+                (static_formatted_text(value) or "")
+                if isinstance(value, ast.FormattedValue)
+                else static_value(value)
+                for value in node.values
+            ]
+            if values and all(isinstance(value, str) for value in values):
+                joined = "".join(value for value in values if isinstance(value, str))
+                if len(joined) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                    projection_failure("static f-string exceeds the bounded projection limit")
+                    return None
+                return joined
+            return None
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            left = static_value(node.left)
+            right = static_value(node.right)
+            if isinstance(left, str) and isinstance(right, str):
+                joined = left + right
+                if len(joined) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                    projection_failure("static string addition exceeds the bounded projection limit")
+                    return None
+                return joined
+            if isinstance(left, bytes) and isinstance(right, bytes):
+                joined = left + right
+                if len(joined) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                    projection_failure("static bytes addition exceeds the bounded projection limit")
+                    return None
+                return joined
+            numeric_types = {int, float, complex}
+            if type(left) in numeric_types and type(right) in numeric_types:
+                return left + right
+        return None
+
+    projections: set[str] = set()
+    for node in ast.walk(tree):
+        value = static_value(node)
+        if isinstance(value, bytes):
+            projections.add(value.decode("latin-1"))
+        elif isinstance(value, str):
+            projections.add(value)
+    return sorted(projections)
 
 
 def validate_access_url_policy(errors: list[str], narrative_only_root: str | None) -> None:
@@ -408,6 +546,83 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         fail(errors, "percent-encoded narrative-only identifier regression")
     if normalize_release_text(r"\U00110000") != r"\U00110000":
         fail(errors, "out-of-range serialized Unicode regression")
+
+    private_deep_url = f"{narrative_only_root}/tree/secret"
+    octal_parts = [f"\\{ord(character):03o}" for character in private_deep_url]
+    octal_deep_url = "".join(octal_parts)
+    octal_split = len(octal_parts) // 2
+    first_octal_half = "".join(octal_parts[:octal_split])
+    second_octal_half = "".join(octal_parts[octal_split:])
+    named_unicode_deep_url = private_deep_url.replace("-", r"\N{HYPHEN-MINUS}")
+    python_literal_cases = (
+        (f'candidate = "{octal_deep_url}"', "Python octal string"),
+        (f'candidate = b"{octal_deep_url}"', "Python octal bytes"),
+        (f'candidate = f"{octal_deep_url}"', "Python octal static f-string"),
+        (
+            f'candidate = "{first_octal_half}" "{second_octal_half}"',
+            "Python adjacent octal strings",
+        ),
+        (
+            f'candidate = "{first_octal_half}" + "{second_octal_half}"',
+            "Python constant octal concatenation",
+        ),
+        (
+            'candidate = f"'
+            + first_octal_half
+            + "{''}"
+            + second_octal_half
+            + '"',
+            "Python constant-field octal f-string",
+        ),
+        (
+            'candidate = f"'
+            + first_octal_half
+            + "{'' + ''}"
+            + second_octal_half
+            + '"',
+            "Python constant-expression octal f-string",
+        ),
+        (
+            'candidate = f"'
+            + first_octal_half
+            + "{runtime_value}"
+            + second_octal_half
+            + '"',
+            "Python conservatively empty dynamic-field f-string",
+        ),
+        (f'candidate = "{named_unicode_deep_url}"', "Python named-Unicode string"),
+    )
+    for source, label in python_literal_cases:
+        parse_errors: list[str] = []
+        projections = python_literal_projections(source, Path("example.py"), parse_errors)
+        if parse_errors or private_deep_url not in projections:
+            fail(errors, f"Python literal privacy projection regression: {label}")
+
+    raw_projections = python_literal_projections(
+        f'candidate = r"{octal_deep_url}"',
+        Path("example.py"),
+        errors,
+    )
+    if private_deep_url in raw_projections:
+        fail(errors, "Python raw-string privacy projection regression")
+    malformed_errors: list[str] = []
+    python_literal_projections(
+        r'candidate = "\N{NOT A UNICODE NAME}"',
+        Path("example.py"),
+        malformed_errors,
+    )
+    if not malformed_errors:
+        fail(errors, "malformed Python literal must fail closed")
+    oversized_format_errors: list[str] = []
+    python_literal_projections(
+        'candidate = f"{\'\':'
+        + str(MAX_PYTHON_STATIC_PROJECTION_CHARS + 1)
+        + '}"',
+        Path("example.py"),
+        oversized_format_errors,
+    )
+    if not oversized_format_errors:
+        fail(errors, "oversized Python static format must fail closed")
 
 
 def validate_schema_documents(errors: list[str]) -> tuple[dict, dict, dict, list[dict]]:
@@ -600,26 +815,44 @@ def validate_release_text(
         is_meta_language = relative in meta_language_paths or relative.parts[:2] == ("registry", "schemas")
         normalized_text = normalize_release_text(text)
         urls = list(iter_owned_github_urls(text))
-        for url in urls:
-            parsed_result = owned_github_url_parts(url)
-            if parsed_result is None:
-                continue
-            _, segments, _ = parsed_result
-            private_root = private_roots_by_name.get(segments[1].casefold())
-            if private_root is not None and not release_url_allowed(
-                relative,
-                url,
-                allowed_roots,
+        privacy_views = [(text, True)]
+        if relative.suffix.lower() == ".py":
+            python_projections = python_literal_projections(text, relative, errors)
+            if python_projections:
+                privacy_views.append(("\n".join(python_projections), False))
+        for privacy_text, normalize_serialized in privacy_views:
+            normalized_privacy_text = (
+                normalize_release_text(privacy_text)
+                if normalize_serialized
+                else privacy_text
+            )
+            privacy_urls = list(
+                iter_owned_github_urls(
+                    privacy_text,
+                    normalize_serialized=normalize_serialized,
+                )
+            )
+            for url in privacy_urls:
+                parsed_result = owned_github_url_parts(url)
+                if parsed_result is None:
+                    continue
+                _, segments, _ = parsed_result
+                private_root = private_roots_by_name.get(segments[1].casefold())
+                if private_root is not None and not release_url_allowed(
+                    relative,
+                    url,
+                    allowed_roots,
+                    narrative_only_root,
+                ):
+                    fail(errors, f"tracked text violates a private repository boundary: {relative}")
+            if "Digital-Assett-Directory" in normalized_privacy_text and DAD_URL not in normalized_privacy_text:
+                fail(errors, f"release text has a non-canonical DAD identifier: {relative}")
+            if narrative_only_root is not None and has_noncanonical_narrative_identifier(
+                privacy_text,
                 narrative_only_root,
+                normalize_serialized=normalize_serialized,
             ):
-                fail(errors, f"tracked text violates a private repository boundary: {relative}")
-        if "Digital-Assett-Directory" in normalized_text and DAD_URL not in normalized_text:
-            fail(errors, f"release text has a non-canonical DAD identifier: {relative}")
-        if narrative_only_root is not None and has_noncanonical_narrative_identifier(
-            normalized_text,
-            narrative_only_root,
-        ):
-            fail(errors, f"release text has a non-canonical narrative-only identifier: {relative}")
+                fail(errors, f"release text has a non-canonical narrative-only identifier: {relative}")
         if is_meta_language:
             continue  # Private boundaries apply above; claim fixtures remain meta-language.
         for pattern in forbidden:
