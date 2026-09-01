@@ -53,6 +53,10 @@ MAX_PYTHON_STATIC_EXPRESSION_DEPTH = 64
 MAX_PYTHON_STATIC_BINDINGS = 2_048
 MAX_PYTHON_STATIC_SEQUENCE_ITEMS = 2_048
 MAX_PYTHON_STATIC_TOTAL_CHARS = 1_048_576
+MAX_STATIC_LANGUAGE_PROJECTION_CHARS = 65_536
+MAX_STATIC_LANGUAGE_ENCODED_CHARS = 131_072
+MAX_STATIC_LANGUAGE_BASE64_CHARS = 87_384
+MAX_EXACT_JAVASCRIPT_INTEGER = 9_007_199_254_740_991
 URL_CANDIDATE_PATTERN = re.compile(
     r"(?i)(?=((?:https?:|[\\/]{2})[^\s<>\[\]()\"'`]+))"
 )
@@ -75,6 +79,513 @@ YAML_ESCAPED_LINE_BREAK = re.compile(r"\\(?:\r\n?|\n)[ \t]*")
 QUOTED_TEXT_LITERAL = re.compile(
     r'''(?s)"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|`((?:\\.|[^`\\])*)`'''
 )
+
+STATIC_JS_CHAR_CALL = re.compile(
+    r"(?is)\bString\s*\.\s*(fromCharCode|fromCodePoint)\s*\(([^()]*)\)"
+)
+STATIC_JS_APPLY_CALL = re.compile(
+    r"(?is)\bString\s*\.\s*(fromCharCode|fromCodePoint)\s*\.\s*apply\s*"
+    r"\(\s*[^,()]{1,256},\s*\[([^\[\]()]*)\]\s*\)"
+)
+STATIC_JS_ATOB_CALL = re.compile(
+    r"(?is)\batob\s*\(\s*(['\"\x60])(.*?)\1\s*\)"
+)
+STATIC_JS_BUFFER_CALL = re.compile(
+    r"(?is)\bBuffer\s*\.\s*from\s*\(\s*(['\"\x60])(.*?)\1\s*,\s*"
+    r"(['\"\x60])(base64|base64url|hex)\3\s*\)"
+)
+STATIC_PS_CHAR_ARRAY = re.compile(
+    r"(?is)\[\s*char\s*\[\s*\]\s*\]\s*(?:@\s*)?\(\s*([^()]*)\s*\)"
+)
+STATIC_PS_CHAR_CAST = re.compile(
+    r"(?is)\[\s*char\s*\](?!\s*\[)\s*([^\s+|;,)]+)"
+)
+STATIC_PS_ENCODING_CALL = re.compile(
+    r"(?is)\[\s*(?:System\.)?Text\.Encoding\s*\]::\s*(ASCII|UTF8)\s*\.\s*"
+    r"GetString\s*\(\s*\[\s*byte\s*\[\s*\]\s*\]\s*(?:@\s*)?"
+    r"\(\s*([^()]*)\s*\)\s*\)"
+)
+STATIC_PS_BASE64_CALL = re.compile(
+    r"(?is)\[\s*(?:System\.)?Convert\s*\]::\s*FromBase64String\s*"
+    r"\(\s*(['\"])(.*?)\1\s*\)"
+)
+STATIC_PS_CHAR_MARKER = re.compile(r"(?is)\[\s*char(?:\s*\[\s*\])?\s*\]")
+STATIC_PS_BYTE_ARRAY_MARKER = re.compile(r"(?is)\[\s*byte\s*\[\s*\]\s*\]")
+
+
+def executable_code_mask(
+    text: str,
+    language: str,
+    lexical_errors: list[str] | None = None,
+) -> bytearray:
+    """Mark code starts while excluding bounded comments and literal documentation."""
+    mask = bytearray(len(text))
+    for position in range(len(mask)):
+        mask[position] = 1
+
+    def hide(start: int, end: int) -> None:
+        for position in range(start, end):
+            mask[position] = 0
+
+    def skip_javascript_string(start: int, delimiter: str) -> int:
+        position = start + 1
+        while position < len(text):
+            if text[position] == "\\":
+                position = min(position + 2, len(text))
+                continue
+            if text[position] == delimiter:
+                return position + 1
+            position += 1
+        return len(text)
+
+    def javascript_closing_parenthesis_is_control_header(
+        position: int,
+        scope_start: int,
+    ) -> bool:
+        depth = 1
+        cursor = position - 1
+        while cursor >= scope_start:
+            if text[cursor] == ")":
+                depth += 1
+            elif text[cursor] == "(":
+                depth -= 1
+                if depth == 0:
+                    prefix = text[scope_start:cursor].rstrip()
+                    keyword_match = re.search(
+                        r"([A-Za-z_$][A-Za-z0-9_$]*)$",
+                        prefix,
+                    )
+                    return bool(
+                        keyword_match
+                        and keyword_match.group(1) in {
+                            "catch", "for", "if", "switch", "while", "with",
+                        }
+                    )
+            cursor -= 1
+        return False
+
+    def javascript_slash_role(position: int, scope_start: int) -> str:
+        previous = position - 1
+        while previous >= scope_start and text[previous].isspace():
+            previous -= 1
+        if previous < scope_start:
+            return "regex"
+        if text[previous] in "([{:;,=!?&|+-*%^~<>":
+            return "regex"
+        prefix = text[scope_start:position].rstrip()
+        keyword_match = re.search(r"([A-Za-z_$][A-Za-z0-9_$]*)$", prefix)
+        if (
+            keyword_match
+            and keyword_match.group(1) in {
+                "await", "case", "delete", "do", "else", "in", "instanceof",
+                "new", "of", "return", "throw", "typeof", "void", "yield",
+            }
+        ):
+            return "regex"
+        if text[previous] == ")":
+            return (
+                "regex"
+                if javascript_closing_parenthesis_is_control_header(previous, scope_start)
+                else "division"
+            )
+        if text[previous] == "}":
+            return "ambiguous"
+        if text[previous].isalnum() or text[previous] in "_$]'\"":
+            return "division"
+        return "ambiguous"
+
+    def javascript_regex_end(start: int) -> int | None:
+        position = start + 1
+        in_character_class = False
+        while position < len(text):
+            character = text[position]
+            if character in {"\r", "\n"}:
+                return None
+            if character == "\\":
+                position = min(position + 2, len(text))
+                continue
+            if character == "[":
+                in_character_class = True
+            elif character == "]" and in_character_class:
+                in_character_class = False
+            elif character == "/" and not in_character_class:
+                position += 1
+                while position < len(text) and text[position].isalpha():
+                    position += 1
+                return position
+            position += 1
+        return None
+
+    def javascript_template_expression_end(start: int) -> int | None:
+        depth = 1
+        position = start
+        while position < len(text):
+            if text.startswith("//", position):
+                end = text.find("\n", position + 2)
+                position = len(text) if end < 0 else end
+                continue
+            if text.startswith("/*", position):
+                end = text.find("*/", position + 2)
+                position = len(text) if end < 0 else end + 2
+                continue
+            if text[position] in {"'", '"'}:
+                position = skip_javascript_string(position, text[position])
+                continue
+            if ord(text[position]) == 96:
+                position = skip_javascript_string(position, text[position])
+                continue
+            if text[position] == "/":
+                slash_role = javascript_slash_role(position, start)
+                if slash_role == "division":
+                    position += 1
+                    continue
+                if slash_role == "ambiguous" and lexical_errors is not None:
+                    lexical_errors.append("ambiguous JavaScript slash expression")
+                regex_end = javascript_regex_end(position)
+                if regex_end is None:
+                    if lexical_errors is not None:
+                        lexical_errors.append("ambiguous JavaScript regex literal")
+                    return None
+                position = regex_end
+                continue
+            if text[position] == "{":
+                depth += 1
+            elif text[position] == "}":
+                depth -= 1
+                if depth == 0:
+                    return position
+            position += 1
+        return None
+
+    index = 0
+    while index < len(text):
+        if language == "javascript" and ord(text[index]) == 96:
+            hide(index, index + 1)
+            cursor = index + 1
+            raw_start = cursor
+            while cursor < len(text):
+                if text[cursor] == "\\":
+                    cursor = min(cursor + 2, len(text))
+                    continue
+                if ord(text[cursor]) == 96:
+                    hide(raw_start, cursor + 1)
+                    index = cursor + 1
+                    break
+                if text.startswith("${", cursor):
+                    hide(raw_start, cursor + 2)
+                    expression_start = cursor + 2
+                    expression_end = javascript_template_expression_end(expression_start)
+                    if expression_end is None:
+                        if lexical_errors is not None:
+                            lexical_errors.append("ambiguous JavaScript template expression")
+                        index = len(text)
+                        break
+                    expression_mask = executable_code_mask(
+                        text[expression_start:expression_end],
+                        language,
+                        lexical_errors,
+                    )
+                    mask[expression_start:expression_end] = expression_mask
+                    hide(expression_end, expression_end + 1)
+                    cursor = expression_end + 1
+                    raw_start = cursor
+                    continue
+                cursor += 1
+            else:
+                hide(raw_start, len(text))
+                index = len(text)
+            continue
+        if language == "javascript" and text.startswith("//", index):
+            end = text.find("\n", index + 2)
+            end = len(text) if end < 0 else end
+            hide(index, end)
+            index = end
+            continue
+        if language == "javascript" and text.startswith("/*", index):
+            end = text.find("*/", index + 2)
+            end = len(text) if end < 0 else end + 2
+            hide(index, end)
+            index = end
+            continue
+        if (
+            language == "javascript"
+            and text[index] == "/"
+        ):
+            slash_role = javascript_slash_role(index, 0)
+            if slash_role == "division":
+                index += 1
+                continue
+            if slash_role == "ambiguous" and lexical_errors is not None:
+                lexical_errors.append("ambiguous JavaScript slash expression")
+            regex_end = javascript_regex_end(index)
+            if regex_end is None:
+                if lexical_errors is not None:
+                    lexical_errors.append("ambiguous JavaScript regex literal")
+                index += 1
+                continue
+            hide(index, regex_end)
+            index = regex_end
+            continue
+        if language == "powershell" and text.startswith("<#", index):
+            end = text.find("#>", index + 2)
+            end = len(text) if end < 0 else end + 2
+            hide(index, end)
+            index = end
+            continue
+        if language == "powershell" and text[index] == "#":
+            end = text.find("\n", index + 1)
+            end = len(text) if end < 0 else end
+            hide(index, end)
+            index = end
+            continue
+        quote = text[index]
+        if quote not in {"'", '"'}:
+            index += 1
+            continue
+        end = index + 1
+        while end < len(text):
+            if language == "javascript" and text[end] == "\\":
+                end = min(end + 2, len(text))
+                continue
+            if language == "powershell" and quote == '"' and ord(text[end]) == 96:
+                end = min(end + 2, len(text))
+                continue
+            if text[end] == quote:
+                if language == "powershell" and end + 1 < len(text) and text[end + 1] == quote:
+                    end += 2
+                    continue
+                end += 1
+                break
+            end += 1
+        literal = text[index:end]
+        if not (language == "powershell" and quote == '"' and "$" in literal):
+            hide(index, end)
+        index = end
+    return mask
+
+
+def parse_static_integer(token: str, *, language: str) -> int:
+    """Parse one bounded JS/PowerShell integer literal without evaluating code."""
+    token = token.strip().replace("_", "")
+    if len(token) > 64:
+        raise ValueError
+    pattern = (
+        r"[+-]?(?:0[xX][0-9A-Fa-f]+|0[bB][01]+|0[oO][0-7]+|[0-9]+)"
+        if language == "javascript"
+        else r"[+-]?(?:0[xX][0-9A-Fa-f]+|[0-9]+)"
+    )
+    if re.fullmatch(pattern, token) is None:
+        raise ValueError
+    sign = -1 if token.startswith("-") else 1
+    unsigned = token.lstrip("+-")
+    if unsigned.lower().startswith("0x"):
+        value = sign * int(unsigned[2:], 16)
+    elif language == "javascript" and unsigned.lower().startswith("0b"):
+        value = sign * int(unsigned[2:], 2)
+    elif language == "javascript" and unsigned.lower().startswith("0o"):
+        value = sign * int(unsigned[2:], 8)
+    else:
+        value = sign * int(unsigned, 10)
+    if language == "javascript" and abs(value) > MAX_EXACT_JAVASCRIPT_INTEGER:
+        raise ValueError
+    return value
+
+
+def parse_static_integer_sequence(payload: str, *, language: str) -> list[int]:
+    """Parse an explicitly bounded comma-separated literal sequence."""
+    if len(payload) > MAX_STATIC_LANGUAGE_PROJECTION_CHARS:
+        raise ValueError
+    payload = payload.strip()
+    if language == "javascript" and payload.startswith("..."):
+        spread = re.fullmatch(r"\.\.\.\s*\[([^\[\]]*)\]", payload, re.S)
+        if spread is None:
+            raise ValueError
+        payload = spread.group(1)
+    if not payload or payload.count(",") >= MAX_PYTHON_STATIC_SEQUENCE_ITEMS:
+        raise ValueError
+    tokens = payload.split(",")
+    if len(tokens) > MAX_PYTHON_STATIC_SEQUENCE_ITEMS or any(not token.strip() for token in tokens):
+        raise ValueError
+    return [parse_static_integer(token, language=language) for token in tokens]
+
+
+def decode_bounded_static_payload(payload: str, encoding: str) -> str:
+    """Decode one bounded Base64/Base64url/hex literal before allocating output."""
+    if len(payload) > MAX_STATIC_LANGUAGE_ENCODED_CHARS:
+        raise ValueError
+    if encoding.casefold() == "hex":
+        compact = re.sub(r"[\x09\x0a\x0c\x0d\x20]", "", payload)
+        if len(compact) > MAX_STATIC_LANGUAGE_ENCODED_CHARS:
+            raise ValueError
+        raw = bytes.fromhex(compact)
+    else:
+        compact = re.sub(r"[\x09\x0a\x0c\x0d\x20]", "", payload)
+        if encoding.casefold() == "base64url":
+            compact = compact.replace("-", "+").replace("_", "/")
+        if len(compact) > MAX_STATIC_LANGUAGE_BASE64_CHARS:
+            raise ValueError
+        compact = compact.ljust(len(compact) + (-len(compact) % 4), "=")
+        padding = len(compact) - len(compact.rstrip("="))
+        quartets = len(compact) // 4
+        maximum_decoded = quartets + quartets + quartets - padding
+        if maximum_decoded > MAX_STATIC_LANGUAGE_PROJECTION_CHARS:
+            raise ValueError
+        raw = base64.b64decode(compact, validate=True)
+    if len(raw) > MAX_STATIC_LANGUAGE_PROJECTION_CHARS:
+        raise ValueError
+    return raw.decode("utf-8")
+
+
+def decode_static_quoted_payload(payload: str, language: str) -> str:
+    """Decode bounded language escapes that can hide static decoder whitespace."""
+    if len(payload) > MAX_STATIC_LANGUAGE_ENCODED_CHARS:
+        raise ValueError
+    payload = normalize_quoted_fragment(payload, language=language)
+    if len(payload) > MAX_STATIC_LANGUAGE_ENCODED_CHARS:
+        raise ValueError
+    if language != "javascript":
+        return payload
+    controls = {
+        "n": "\n",
+        "r": "\r",
+        "t": "\t",
+        "f": "\f",
+        "v": "\v",
+        "\\": "\\",
+        "'": "'",
+        '"': '"',
+    }
+    return re.sub(
+        r"\\([nrtfv\\'\"])",
+        lambda match: controls[match.group(1)],
+        payload,
+    )
+
+
+def static_language_projections(text: str, relative: Path, errors: list[str]) -> list[str]:
+    """Project bounded executable JS/TS and PowerShell constant text in source order."""
+    language = quoted_fragment_language(relative)
+    if language not in {"javascript", "powershell"}:
+        return []
+    lexical_errors: list[str] = []
+    code_mask = executable_code_mask(text, language, lexical_errors)
+    for lexical_error in lexical_errors:
+        fail(errors, f"{lexical_error}: {relative}")
+    positioned: list[tuple[int, str]] = []
+    covered_spans: list[tuple[int, int]] = []
+    projection_chars = 0
+    projection_bound_failed = False
+
+    def executable(match: re.Match[str]) -> bool:
+        return match.start() < len(code_mask) and bool(code_mask[match.start()])
+
+    def add(match: re.Match[str], value: str) -> None:
+        nonlocal projection_chars, projection_bound_failed
+        if (
+            len(value) > MAX_STATIC_LANGUAGE_PROJECTION_CHARS
+            or len(positioned) >= MAX_PYTHON_STATIC_SEQUENCE_ITEMS
+            or projection_chars > MAX_STATIC_LANGUAGE_PROJECTION_CHARS - len(value)
+        ):
+            projection_bound_failed = True
+            raise ValueError
+        positioned.append((match.start(), value))
+        covered_spans.append(match.span())
+        projection_chars += len(value)
+
+    def add_error(message: str) -> None:
+        fail(errors, f"{message}: {relative}")
+
+    if language == "javascript":
+        for pattern, is_apply in (
+            (STATIC_JS_APPLY_CALL, True),
+            (STATIC_JS_CHAR_CALL, False),
+        ):
+            for match in pattern.finditer(text):
+                if not executable(match):
+                    continue
+                try:
+                    kind = match.group(1).casefold()
+                    values = parse_static_integer_sequence(match.group(2), language=language)
+                    if kind == "fromcharcode":
+                        value = "".join(chr(item & 0xFFFF) for item in values)
+                    elif all(0 <= item <= 0x10FFFF for item in values):
+                        value = "".join(chr(item) for item in values)
+                    else:
+                        raise ValueError
+                    add(match, value)
+                except (ValueError, UnicodeError):
+                    add_error("recognized JavaScript character constructor is unresolved or malformed")
+        for match in STATIC_JS_ATOB_CALL.finditer(text):
+            if not executable(match):
+                continue
+            try:
+                payload = decode_static_quoted_payload(match.group(2), language)
+                add(match, decode_bounded_static_payload(payload, "base64"))
+            except (ValueError, UnicodeDecodeError, binascii.Error):
+                add_error("recognized JavaScript Base64 decoder is unresolved or malformed")
+        for match in STATIC_JS_BUFFER_CALL.finditer(text):
+            if not executable(match):
+                continue
+            try:
+                payload = decode_static_quoted_payload(match.group(2), language)
+                add(match, decode_bounded_static_payload(payload, match.group(4)))
+            except (ValueError, UnicodeDecodeError, binascii.Error):
+                add_error("recognized JavaScript buffer decoder is unresolved or malformed")
+    else:
+        for match in STATIC_PS_CHAR_ARRAY.finditer(text):
+            if not executable(match):
+                continue
+            try:
+                values = parse_static_integer_sequence(match.group(1), language=language)
+                if any(item < 0 or item > 0xFFFF for item in values):
+                    raise ValueError
+                add(match, "".join(chr(item) for item in values))
+            except (ValueError, UnicodeError):
+                add_error("recognized PowerShell character array is unresolved or malformed")
+        for match in STATIC_PS_CHAR_CAST.finditer(text):
+            if not executable(match):
+                continue
+            try:
+                value = parse_static_integer(match.group(1), language=language)
+                if value < 0 or value > 0xFFFF:
+                    raise ValueError
+                add(match, chr(value))
+            except (ValueError, UnicodeError):
+                add_error("recognized PowerShell character cast is unresolved or malformed")
+        for match in STATIC_PS_ENCODING_CALL.finditer(text):
+            if not executable(match):
+                continue
+            try:
+                values = parse_static_integer_sequence(match.group(2), language=language)
+                if any(item < 0 or item > 255 for item in values):
+                    raise ValueError
+                codec = "ascii" if match.group(1).casefold() == "ascii" else "utf-8"
+                add(match, bytes(values).decode(codec))
+            except (ValueError, UnicodeDecodeError):
+                add_error("recognized PowerShell byte decoder is unresolved or malformed")
+        for match in STATIC_PS_BASE64_CALL.finditer(text):
+            if not executable(match):
+                continue
+            try:
+                payload = decode_static_quoted_payload(match.group(2), language)
+                add(match, decode_bounded_static_payload(payload, "base64"))
+            except (ValueError, UnicodeDecodeError, binascii.Error):
+                add_error("recognized PowerShell Base64 decoder is unresolved or malformed")
+        for marker_pattern in (STATIC_PS_CHAR_MARKER, STATIC_PS_BYTE_ARRAY_MARKER):
+            for marker in marker_pattern.finditer(text):
+                if not executable(marker):
+                    continue
+                if not any(start <= marker.start() < end for start, end in covered_spans):
+                    add_error("recognized PowerShell text constructor is unresolved or malformed")
+
+    positioned.sort(key=lambda item: item[0])
+    if projection_bound_failed:
+        add_error("static language projections exceed the bounded total")
+        return []
+    values = [value for _, value in positioned]
+    if len(values) > 1:
+        values.append("".join(values))
+    return values
 
 
 def read_json(path: Path) -> dict:
@@ -2620,6 +3131,322 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         narrative_only_root,
     ):
         fail(errors, "generic quoted-fragment ordinary-text regression")
+
+    def static_language_policy_result(source: str, suffix: str) -> tuple[bool, list[str]]:
+        projection_errors: list[str] = []
+        relative = Path(f"example{suffix}")
+        projections = static_language_projections(source, relative, projection_errors)
+        projected_values = [source]
+        projected_values.extend(json.dumps(value) for value in projections)
+        projected_source = "\n".join(projected_values)
+        blocked = bool(projection_errors) or has_noncanonical_narrative_identifier(
+            projected_source,
+            narrative_only_root,
+            quoted_language=quoted_fragment_language(relative),
+        )
+        for url in iter_owned_github_urls(projected_source):
+            parsed_result = owned_github_url_parts(url)
+            if parsed_result is None:
+                continue
+            _, segments, _ = parsed_result
+            if (
+                segments[1].casefold() == repository_name.casefold()
+                and not release_url_allowed(
+                    relative,
+                    url,
+                    {narrative_only_root},
+                    narrative_only_root,
+                )
+            ):
+                blocked = True
+        return blocked, projection_errors
+
+    private_codes = [ord(character) for character in private_deep_url]
+    private_code_text = ", ".join(str(value) for value in private_codes)
+    split_index = len(private_codes) // 2
+    first_code_text = ", ".join(str(value) for value in private_codes[:split_index])
+    second_code_text = ", ".join(str(value) for value in private_codes[split_index:])
+    wrapped_code_text = ", ".join(str(value + 0x10000) for value in private_codes)
+    private_base64 = base64.b64encode(private_deep_bytes).decode("ascii")
+    spaced_private_base64 = " \n".join(
+        private_base64[index:index + 8]
+        for index in range(0, len(private_base64), 8)
+    )
+    private_hexadecimal = private_deep_bytes.hex()
+    template_delimiter = chr(96)
+
+    static_language_attacks = (
+        (
+            f"const candidate = String.fromCharCode({private_code_text});",
+            ".js",
+            "JavaScript direct fromCharCode",
+        ),
+        (
+            "const candidate = "
+            + template_delimiter
+            + "${String.fromCharCode("
+            + private_code_text
+            + ")}"
+            + template_delimiter
+            + ";",
+            ".js",
+            "JavaScript template interpolation",
+        ),
+        (
+            "const candidate = "
+            + template_delimiter
+            + "${/}/.source && String.fromCharCode("
+            + private_code_text
+            + ")}"
+            + template_delimiter
+            + ";",
+            ".js",
+            "JavaScript template regex brace",
+        ),
+        (
+            "const candidate = "
+            + template_delimiter
+            + "${/\\}/.source && String.fromCharCode("
+            + private_code_text
+            + ")}"
+            + template_delimiter
+            + ";",
+            ".js",
+            "JavaScript template escaped regex brace",
+        ),
+        (
+            "const candidate = "
+            + template_delimiter
+            + "${/[}]/.source && String.fromCharCode("
+            + private_code_text
+            + ")}"
+            + template_delimiter
+            + ";",
+            ".js",
+            "JavaScript template regex character-class brace",
+        ),
+        (
+            "const candidate = "
+            + template_delimiter
+            + "${(()=>{if(false){}else /}/.source;return true})()&&String.fromCharCode("
+            + private_code_text
+            + ")}"
+            + template_delimiter
+            + ";",
+            ".js",
+            "JavaScript template regex after else",
+        ),
+        (
+            "const candidate = "
+            + template_delimiter
+            + "${(()=>{if(false)/}/.source;return true})()&&String.fromCharCode("
+            + private_code_text
+            + ")}"
+            + template_delimiter
+            + ";",
+            ".js",
+            "JavaScript template regex after control header",
+        ),
+        (
+            "const candidate = "
+            + template_delimiter
+            + "${(()=>{do /}/.source;while(false);return true})()&&String.fromCharCode("
+            + private_code_text
+            + ")}"
+            + template_delimiter
+            + ";",
+            ".js",
+            "JavaScript template regex after do",
+        ),
+        (
+            f"const first = String.fromCharCode({first_code_text});\n"
+            + f"const second = String.fromCharCode({second_code_text});",
+            ".ts",
+            "JavaScript source-ordered constructor recomposition",
+        ),
+        (
+            f"const candidate = String.fromCodePoint.apply(null, [{private_code_text}]);",
+            ".js",
+            "JavaScript fromCodePoint apply",
+        ),
+        (
+            f"const candidate = String.fromCharCode(...[{private_code_text}]);",
+            ".tsx",
+            "JavaScript spread character construction",
+        ),
+        (
+            f"const candidate = String.fromCharCode({wrapped_code_text});",
+            ".mjs",
+            "JavaScript fromCharCode 16-bit conversion",
+        ),
+        (
+            f"const codes = [{private_code_text}];\n"
+            + "const candidate = codes.map(value => String.fromCharCode(value)).join('');",
+            ".js",
+            "JavaScript unresolved map-join fail closed",
+        ),
+        (
+            "const candidate = atob(" + json.dumps(spaced_private_base64) + ");",
+            ".js",
+            "JavaScript Base64 whitespace",
+        ),
+        (
+            "const candidate = Buffer.from("
+            + json.dumps(private_base64)
+            + ", 'base64').toString();",
+            ".cjs",
+            "JavaScript explicit Base64 buffer",
+        ),
+        (
+            "const candidate = Buffer.from("
+            + json.dumps(private_hexadecimal)
+            + ', "hex").toString();',
+            ".ts",
+            "JavaScript explicit hexadecimal buffer",
+        ),
+        (
+            f"$candidate = [char[]]({private_code_text}) -join ''",
+            ".ps1",
+            "PowerShell character array",
+        ),
+        (
+            "$candidate = "
+            + " + ".join(f"[char]{value}" for value in private_codes),
+            ".psm1",
+            "PowerShell source-ordered character casts",
+        ),
+        (
+            f"$codes = @({private_code_text}); "
+            + "$candidate = $codes | ForEach-Object { [char]$_ }",
+            ".ps1",
+            "PowerShell unresolved pipeline fail closed",
+        ),
+        (
+            f"$candidate = [Text.Encoding]::ASCII.GetString([byte[]]({private_code_text}))",
+            ".ps1",
+            "PowerShell ASCII byte decoding",
+        ),
+        (
+            f"$candidate = [System.Text.Encoding]::UTF8.GetString([byte[]]({private_code_text}))",
+            ".ps1",
+            "PowerShell UTF-8 byte decoding",
+        ),
+        (
+            "$candidate = [Convert]::FromBase64String("
+            + json.dumps(spaced_private_base64)
+            + ")",
+            ".ps1",
+            "PowerShell Base64 decoding",
+        ),
+    )
+    for source, suffix, label in static_language_attacks:
+        blocked, _ = static_language_policy_result(source, suffix)
+        if not blocked:
+            fail(errors, f"static-language privacy projection regression: {label}")
+
+    altered_private = private_deep_url.replace(
+        repository_name,
+        "X" + repository_name[1:],
+        1,
+    )
+    altered_codes = ", ".join(str(ord(character)) for character in altered_private)
+    static_language_controls = (
+        ("const ordinary = String.fromCharCode(65, 66, 67);", ".js", "ordinary JavaScript characters"),
+        (
+            f"const altered = String.fromCharCode({altered_codes});",
+            ".ts",
+            "altered JavaScript route",
+        ),
+        (
+            f"// String.fromCharCode({private_code_text})",
+            ".js",
+            "JavaScript line comment",
+        ),
+        (
+            "const documentation = "
+            + json.dumps(f"String.fromCharCode({private_code_text})")
+            + ";",
+            ".js",
+            "JavaScript documentation string",
+        ),
+        (
+            "const documentation = "
+            + template_delimiter
+            + f"String.fromCharCode({private_code_text})"
+            + template_delimiter
+            + ";",
+            ".js",
+            "JavaScript static template documentation",
+        ),
+        (
+            "const calculation = "
+            + template_delimiter
+            + "${8 / 2}"
+            + template_delimiter
+            + ";",
+            ".js",
+            "JavaScript template ordinary division",
+        ),
+        (
+            r"const documentation = /String\.fromCharCode\(65,66,67\)/;",
+            ".js",
+            "JavaScript regex documentation",
+        ),
+        (
+            f"# [char[]]({private_code_text})",
+            ".ps1",
+            "PowerShell line comment",
+        ),
+        (
+            "$documentation = " + json.dumps(f"[char[]]({private_code_text})"),
+            ".ps1",
+            "PowerShell documentation string",
+        ),
+        ("const ordinary = Buffer.from('hello');", ".js", "ordinary JavaScript buffer"),
+    )
+    for source, suffix, label in static_language_controls:
+        blocked, projection_errors = static_language_policy_result(source, suffix)
+        if blocked or projection_errors:
+            fail(errors, f"static-language ordinary control regression: {label}")
+
+    oversized_sequence = ",".join(
+        "65" for _ in range(MAX_PYTHON_STATIC_SEQUENCE_ITEMS + 1)
+    )
+    precision_attack_codes = list(private_codes)
+    precision_index = next(
+        index for index, value in enumerate(precision_attack_codes)
+        if value % 4 == 0
+    )
+    precision_attack_codes[precision_index] = (
+        MAX_EXACT_JAVASCRIPT_INTEGER
+        + precision_attack_codes[precision_index]
+        + 2
+    )
+    precision_attack_source = "String.fromCharCode(" + ",".join(
+        str(value) for value in precision_attack_codes
+    ) + ");"
+    static_language_fail_closed = (
+        ("String.fromCodePoint(1114112);", ".js", "invalid JavaScript code point"),
+        ("String.fromCharCode();", ".js", "empty JavaScript character call"),
+        ("String.fromCharCode(runtimeValue);", ".js", "unresolved JavaScript character call"),
+        (
+            precision_attack_source,
+            ".js",
+            "inexact JavaScript numeric literal",
+        ),
+        (
+            f"String.fromCharCode({oversized_sequence});",
+            ".js",
+            "oversized JavaScript character call",
+        ),
+        ("$candidate = [char]$runtimeValue", ".ps1", "unresolved PowerShell character cast"),
+        ("$candidate = [char[]]()", ".ps1", "empty PowerShell character array"),
+    )
+    for source, suffix, label in static_language_fail_closed:
+        blocked, projection_errors = static_language_policy_result(source, suffix)
+        if not blocked or not projection_errors:
+            fail(errors, f"static-language fail-closed regression: {label}")
+
     character_fragment_source = (
         'dash = chr(45)\nparts = ('
         + ", ".join(f'"{word}"' for word in protected_words)
@@ -3032,6 +3859,18 @@ def validate_release_text(
             )
             if python_projections:
                 privacy_views.append(("\n".join(python_projections), False))
+        elif relative.suffix.lower() in {
+            ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts",
+            ".ps1", ".psm1", ".psd1",
+        }:
+            language_projections = static_language_projections(text, relative, errors)
+            if language_projections:
+                projected_values = [text]
+                projected_values.extend(
+                    json.dumps(value) for value in language_projections
+                )
+                projected_source = "\n".join(projected_values)
+                privacy_views.append((projected_source, True))
         for privacy_text, normalize_serialized in privacy_views:
             normalized_privacy_text = (
                 normalize_privacy_text(privacy_text)
