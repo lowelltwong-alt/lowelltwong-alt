@@ -1216,6 +1216,31 @@ def python_literal_projections(
         complex,
         bool,
     }
+    static_builtin_marker = "__profile_static_builtin__"
+    static_builtin_names = frozenset({
+        "bytearray",
+        "bytes",
+        "chr",
+        "int",
+        "list",
+        "map",
+        "ord",
+        "tuple",
+    })
+
+    def static_builtin_token(name: str) -> tuple[str, str]:
+        return static_builtin_marker, name
+
+    def static_builtin_name(value: object) -> str | None:
+        if (
+            isinstance(value, tuple)
+            and len(value) == 2
+            and value[0] == static_builtin_marker
+            and isinstance(value[1], str)
+            and value[1] in static_builtin_names
+        ):
+            return value[1]
+        return None
 
     def projection_failure(message: str) -> None:
         full_message = f"tracked Python privacy projection failed: {relative}: {message}"
@@ -1795,6 +1820,237 @@ def python_literal_projections(
         conversion = None if node.conversion == -1 else chr(node.conversion)
         return static_render_field(value, format_spec, conversion)
 
+    def bounded_static_items(
+        values: tuple[object, ...],
+        context: str,
+    ) -> tuple[object, ...] | None:
+        if len(values) > MAX_PYTHON_STATIC_SEQUENCE_ITEMS:
+            projection_failure(f"{context} exceeds the bounded item limit")
+            return None
+        if not all(is_safe_materialized(value) for value in values):
+            return None
+        if materialized_text_size(values) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+            projection_failure(f"{context} exceeds the bounded projection limit")
+            return None
+        return values
+
+    def static_iterable_items(
+        value: object,
+        context: str,
+    ) -> tuple[object, ...] | None:
+        if static_builtin_name(value) is not None:
+            return None
+        if isinstance(value, tuple):
+            values = value
+        elif isinstance(value, str):
+            if len(value) > MAX_PYTHON_STATIC_SEQUENCE_ITEMS:
+                projection_failure(f"{context} exceeds the bounded item limit")
+                return None
+            values = tuple(value)
+        elif isinstance(value, bytes):
+            if len(value) > MAX_PYTHON_STATIC_SEQUENCE_ITEMS:
+                projection_failure(f"{context} exceeds the bounded item limit")
+                return None
+            values = tuple(value)
+        else:
+            return None
+        return bounded_static_items(values, context)
+
+    def static_call_arguments(
+        node: ast.Call,
+        environment: dict[str, object],
+        depth: int,
+    ) -> tuple[tuple[object, ...], dict[str, object]] | None:
+        arguments: list[object] = []
+        keyword_arguments: dict[str, object] = {}
+        argument_chars = 0
+        for argument_node in node.args:
+            if isinstance(argument_node, ast.Starred):
+                expanded_value = static_value(
+                    argument_node.value,
+                    environment,
+                    depth + 1,
+                )
+                expanded = static_iterable_items(
+                    expanded_value,
+                    "static starred call arguments",
+                )
+                if expanded is None:
+                    return None
+            else:
+                value = static_value(argument_node, environment, depth + 1)
+                if not is_safe_materialized(value):
+                    return None
+                expanded = (value,)
+            if len(arguments) + len(expanded) > MAX_PYTHON_STATIC_SEQUENCE_ITEMS:
+                projection_failure(
+                    "static call arguments exceed the bounded item limit"
+                )
+                return None
+            argument_chars += materialized_text_size(expanded)
+            if argument_chars > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                projection_failure(
+                    "static call arguments exceed the bounded projection limit"
+                )
+                return None
+            arguments.extend(expanded)
+        for keyword in node.keywords:
+            if keyword.arg is None or keyword.arg in keyword_arguments:
+                return None
+            value = static_value(keyword.value, environment, depth + 1)
+            if not is_safe_materialized(value):
+                return None
+            if (
+                len(arguments) + len(keyword_arguments) + 1
+                > MAX_PYTHON_STATIC_SEQUENCE_ITEMS
+            ):
+                projection_failure(
+                    "static call arguments exceed the bounded item limit"
+                )
+                return None
+            argument_chars += materialized_text_size(value)
+            if argument_chars > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                projection_failure(
+                    "static call arguments exceed the bounded projection limit"
+                )
+                return None
+            keyword_arguments[keyword.arg] = value
+        return tuple(arguments), keyword_arguments
+
+    def static_byte_constructor(argument: object) -> bytes | None:
+        if isinstance(argument, bytes):
+            return argument
+        if type(argument) in {int, bool}:
+            output_length = int(argument)
+            if output_length < 0:
+                return None
+            if output_length > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                projection_failure(
+                    "static byte-constructor output exceeds the bounded projection limit"
+                )
+                return None
+            return bytes(output_length)
+        values = static_iterable_items(
+            argument,
+            "static byte-constructor sequence",
+        )
+        if values is None or not all(type(item) in {int, bool} for item in values):
+            return None
+        normalized = [int(item) for item in values]
+        if any(item < 0 or item > 255 for item in normalized):
+            return None
+        return bytes(normalized)
+
+    def apply_static_builtin(
+        name: str,
+        arguments: tuple[object, ...],
+        depth: int,
+        keyword_arguments: dict[str, object] | None = None,
+    ) -> object | None:
+        keyword_arguments = keyword_arguments or {}
+        if depth > MAX_PYTHON_STATIC_EXPRESSION_DEPTH:
+            projection_failure("static builtin call exceeds the bounded evaluation depth")
+            return None
+        if (
+            name in {"bytes", "bytearray"}
+            and len(arguments) == 1
+            and not keyword_arguments
+        ):
+            return static_byte_constructor(arguments[0])
+        if name in {"list", "tuple"} and len(arguments) == 1 and not keyword_arguments:
+            return static_iterable_items(
+                arguments[0],
+                f"static {name} wrapper",
+            )
+        if (
+            name == "chr"
+            and len(arguments) == 1
+            and not keyword_arguments
+            and type(arguments[0]) in {int, bool}
+        ):
+            try:
+                return chr(int(arguments[0]))
+            except (OverflowError, ValueError):
+                return None
+        if (
+            name == "ord"
+            and len(arguments) == 1
+            and not keyword_arguments
+            and isinstance(arguments[0], (str, bytes))
+            and len(arguments[0]) == 1
+        ):
+            return ord(arguments[0])
+        if name == "int" and set(keyword_arguments) <= {"base"}:
+            if "base" in keyword_arguments:
+                if len(arguments) != 1:
+                    return None
+                base = keyword_arguments["base"]
+            elif len(arguments) == 2:
+                base = arguments[1]
+            elif len(arguments) == 1:
+                base = None
+            else:
+                return None
+            value = arguments[0]
+            if isinstance(value, (str, bytes)) and (
+                len(value) > MAX_PYTHON_STATIC_PROJECTION_CHARS
+            ):
+                projection_failure(
+                    "static integer input exceeds the bounded projection limit"
+                )
+                return None
+            try:
+                if base is None:
+                    if type(value) not in {str, bytes, int, float, bool}:
+                        return None
+                    normalized_integer = int(value)
+                else:
+                    if type(base) not in {int, bool}:
+                        return None
+                    normalized_base = int(base)
+                    if normalized_base != 0 and not 2 <= normalized_base <= 36:
+                        return None
+                    if not isinstance(value, (str, bytes)):
+                        return None
+                    normalized_integer = int(value, normalized_base)
+            except (OverflowError, TypeError, ValueError):
+                return None
+            if normalized_integer.bit_length() > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                projection_failure(
+                    "static integer conversion exceeds the bounded projection limit"
+                )
+                return None
+            return normalized_integer
+        if name == "map" and len(arguments) >= 2 and not keyword_arguments:
+            mapped_name = static_builtin_name(arguments[0])
+            if mapped_name is None or mapped_name == "map":
+                return None
+            iterables: list[tuple[object, ...]] = []
+            for value in arguments[1:]:
+                items = static_iterable_items(value, "static map input")
+                if items is None:
+                    return None
+                iterables.append(items)
+            item_count = min((len(items) for items in iterables), default=0)
+            results: list[object] = []
+            result_chars = 0
+            for index in range(item_count):
+                mapped = apply_static_builtin(
+                    mapped_name,
+                    tuple(items[index] for items in iterables),
+                    depth + 1,
+                    {},
+                )
+                if not is_safe_materialized(mapped):
+                    return None
+                result_chars += materialized_text_size(mapped)
+                if result_chars > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                    projection_failure("static map output exceeds the bounded projection limit")
+                    return None
+                results.append(mapped)
+            return bounded_static_items(tuple(results), "static map output")
+        return None
+
     def static_comprehension_sequence(
         node: ast.GeneratorExp | ast.ListComp,
         environment: dict[str, object],
@@ -1828,9 +2084,13 @@ def python_literal_projections(
                 current,
                 depth + generator_index + 1,
             )
-            if not isinstance(iterable, tuple):
+            iterable_items = static_iterable_items(
+                iterable,
+                "static comprehension input",
+            )
+            if iterable_items is None:
                 return False
-            for item in iterable:
+            for item in iterable_items:
                 item_environment = dict(current)
                 bind_assignment_target(item_environment, generator.target, item)
                 if not target_names(generator.target) <= set(item_environment):
@@ -1876,17 +2136,45 @@ def python_literal_projections(
             if len(node.elts) > MAX_PYTHON_STATIC_SEQUENCE_ITEMS:
                 projection_failure("static sequence exceeds the bounded item limit")
                 return None
-            values = tuple(
-                static_value(item, environment, depth + 1)
-                for item in node.elts
-            )
-            if all(is_safe_materialized(value) for value in values):
-                return values
-            return None
+            values: list[object] = []
+            value_chars = 0
+            for item in node.elts:
+                if isinstance(item, ast.Starred):
+                    expanded_value = static_value(
+                        item.value,
+                        environment,
+                        depth + 1,
+                    )
+                    expanded = static_iterable_items(
+                        expanded_value,
+                        "static starred sequence",
+                    )
+                    if expanded is None:
+                        return None
+                else:
+                    value = static_value(item, environment, depth + 1)
+                    if not is_safe_materialized(value):
+                        return None
+                    expanded = (value,)
+                if len(values) + len(expanded) > MAX_PYTHON_STATIC_SEQUENCE_ITEMS:
+                    projection_failure("static sequence exceeds the bounded item limit")
+                    return None
+                value_chars += materialized_text_size(expanded)
+                if value_chars > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                    projection_failure(
+                        "static sequence exceeds the bounded projection limit"
+                    )
+                    return None
+                values.extend(expanded)
+            return tuple(values)
         if isinstance(node, (ast.GeneratorExp, ast.ListComp)):
             return static_comprehension_sequence(node, environment, depth + 1)
         if isinstance(node, ast.Name):
-            return environment.get(node.id)
+            if node.id in environment:
+                return environment[node.id]
+            if node.id in static_builtin_names:
+                return static_builtin_token(node.id)
+            return None
         if isinstance(node, ast.UnaryOp):
             operand = static_value(node.operand, environment, depth + 1)
             if isinstance(node.op, ast.Not) and is_safe_materialized(operand):
@@ -1968,24 +2256,20 @@ def python_literal_projections(
                     return None
                 values.append(value)
             return "".join(values)
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and len(node.args) == 1
-            and not node.keywords
-        ):
-            argument = static_value(node.args[0], environment, depth + 1)
-            if node.func.id == "chr" and type(argument) in {int, bool}:
-                try:
-                    return chr(int(argument))
-                except (OverflowError, ValueError):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            callable_value = static_value(node.func, environment, depth + 1)
+            callable_name = static_builtin_name(callable_value)
+            if callable_name is not None:
+                call_arguments = static_call_arguments(node, environment, depth + 1)
+                if call_arguments is None:
                     return None
-            if (
-                node.func.id == "ord"
-                and isinstance(argument, (str, bytes))
-                and len(argument) == 1
-            ):
-                return ord(argument)
+                arguments, keyword_arguments = call_arguments
+                return apply_static_builtin(
+                    callable_name,
+                    arguments,
+                    depth + 1,
+                    keyword_arguments,
+                )
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
             attribute = node.func.attr
             if (
@@ -2889,6 +3173,23 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     named_unicode_deep_url = private_deep_url.replace("-", r"\N{HYPHEN-MINUS}")
     hexadecimal_deep_url = private_deep_url.encode("utf-8").hex()
     private_deep_bytes = private_deep_url.encode("utf-8")
+    numeric_deep_url_list = json.dumps(list(private_deep_bytes))
+    numeric_deep_url_tuple = "(" + ", ".join(
+        str(value) for value in private_deep_bytes
+    ) + ",)"
+    numeric_deep_url_strings = json.dumps([
+        str(value) for value in private_deep_bytes
+    ])
+    hexadecimal_deep_url_strings = json.dumps([
+        format(value, "x") for value in private_deep_bytes
+    ])
+    prefixed_hexadecimal_deep_url_strings = json.dumps([
+        f"0x{value:x}" for value in private_deep_bytes
+    ])
+    decimal_byte_bases = json.dumps([10 for _ in private_deep_bytes])
+    hexadecimal_byte_bases = json.dumps([16 for _ in private_deep_bytes])
+    inferred_byte_bases = json.dumps([0 for _ in private_deep_bytes])
+    character_deep_url_list = json.dumps(list(private_deep_url))
 
     def raw_deflate(payload: bytes) -> bytes:
         compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
@@ -3140,6 +3441,104 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             "Python static hexadecimal bytearray decoding",
         ),
         (
+            f"candidate = bytes({numeric_deep_url_list}).decode()",
+            "Python static numeric bytes decoding",
+        ),
+        (
+            f"candidate = bytearray({numeric_deep_url_tuple}).decode('utf-8')",
+            "Python static numeric bytearray decoding",
+        ),
+        (
+            f"values = {numeric_deep_url_tuple}\n"
+            + "candidate = bytes(values).decode()",
+            "Python name-bound numeric bytes decoding",
+        ),
+        (
+            "candidate = bytes(value for value in "
+            + numeric_deep_url_tuple
+            + ").decode()",
+            "Python generated numeric bytes decoding",
+        ),
+        (
+            f"values = {numeric_deep_url_tuple}\n"
+            + "candidate = bytes([*values]).decode()",
+            "Python starred-list numeric bytes decoding",
+        ),
+        (
+            f"values = {numeric_deep_url_tuple}\n"
+            + "candidate = bytearray((*values,)).decode()",
+            "Python starred-tuple numeric bytearray decoding",
+        ),
+        (
+            f"values = {numeric_deep_url_tuple}\n"
+            + "candidate = bytes(*(values,)).decode()",
+            "Python starred-call numeric bytes decoding",
+        ),
+        (
+            f"candidate = bytes([*{numeric_deep_url_list}]).decode()",
+            "Python direct-starred numeric bytes decoding",
+        ),
+        (
+            f"values = {numeric_deep_url_tuple}\n"
+            + "constructor = bytes\n"
+            + "candidate = constructor(values).decode()",
+            "Python aliased numeric bytes decoding",
+        ),
+        (
+            f"values = {numeric_deep_url_tuple}\n"
+            + "candidate = bytes(list(values)).decode()",
+            "Python list-wrapped numeric bytes decoding",
+        ),
+        (
+            f"characters = {character_deep_url_list}\n"
+            + "candidate = bytes(map(ord, characters)).decode()",
+            "Python mapped-ordinal bytes decoding",
+        ),
+        (
+            f"values = {numeric_deep_url_strings}\n"
+            + "constructor = bytes\n"
+            + "mapper = map\n"
+            + "converter = int\n"
+            + "candidate = constructor(mapper(converter, values)).decode()",
+            "Python aliased mapped-integer bytes decoding",
+        ),
+        (
+            f"values = {numeric_deep_url_strings}\n"
+            + "candidate = bytes(int(value, 10) for value in values).decode()",
+            "Python positional-base integer bytes decoding",
+        ),
+        (
+            f"values = {hexadecimal_deep_url_strings}\n"
+            + "converter = int\n"
+            + "candidate = bytes(converter(value, 16) for value in values).decode()",
+            "Python aliased hexadecimal integer bytes decoding",
+        ),
+        (
+            f"values = {numeric_deep_url_strings}\n"
+            + "candidate = bytes(int(value, base=10) for value in values).decode()",
+            "Python keyword-base integer bytes decoding",
+        ),
+        (
+            f"values = {numeric_deep_url_strings}\n"
+            + f"bases = {decimal_byte_bases}\n"
+            + "candidate = bytes(map(int, values, bases)).decode()",
+            "Python multi-iterable decimal map decoding",
+        ),
+        (
+            f"values = {hexadecimal_deep_url_strings}\n"
+            + f"bases = {hexadecimal_byte_bases}\n"
+            + "mapper = map\n"
+            + "converter = int\n"
+            + "candidate = bytes(mapper(converter, values, bases)).decode()",
+            "Python aliased multi-iterable hexadecimal map decoding",
+        ),
+        (
+            f"values = {prefixed_hexadecimal_deep_url_strings}\n"
+            + f"bases = {inferred_byte_bases}\n"
+            + "candidate = bytes(map(int, values, bases)).decode()",
+            "Python inferred-base multi-iterable map decoding",
+        ),
+        (
             'candidate = zlib.decompress(bytes.fromhex("'
             + zlib.compress(private_deep_bytes).hex()
             + '")).decode()',
@@ -3199,6 +3598,38 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     )
     if not compressed_bound_errors:
         fail(errors, "Python compressed-payload output-bound regression")
+
+    byte_constructor_bound_errors: list[str] = []
+    python_literal_projections(
+        f"candidate = bytes({MAX_PYTHON_STATIC_PROJECTION_CHARS + 1}).decode()",
+        Path("example.py"),
+        byte_constructor_bound_errors,
+        protected_identifier=repository_name,
+    )
+    if not byte_constructor_bound_errors:
+        fail(errors, "Python byte-constructor output-bound regression")
+
+    starred_constructor_bound_errors: list[str] = []
+    python_literal_projections(
+        "values = (65,) * "
+        + str(MAX_PYTHON_STATIC_SEQUENCE_ITEMS + 1)
+        + "\ncandidate = bytes([*values]).decode()",
+        Path("example.py"),
+        starred_constructor_bound_errors,
+        protected_identifier=repository_name,
+    )
+    if not starred_constructor_bound_errors:
+        fail(errors, "Python starred byte-constructor item-bound regression")
+
+    invalid_integer_base_errors: list[str] = []
+    invalid_integer_base_projections = python_literal_projections(
+        'candidate = int("104", base=1)',
+        Path("example.py"),
+        invalid_integer_base_errors,
+        protected_identifier=repository_name,
+    )
+    if invalid_integer_base_errors or private_deep_url in invalid_integer_base_projections:
+        fail(errors, "Python invalid integer-base control regression")
 
     cumulative_compressed_payload = b"".join(
         zlib.compress(bytes(65 + index for _ in range(40_000)))
