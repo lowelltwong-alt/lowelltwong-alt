@@ -45,6 +45,9 @@ STRUCTURED_PRIVATE_ACCESS_URLS = {DAD_URL}
 NARRATIVE_ONLY_ACCESS_URL_SHA256 = "4cf7299d0f996d643bbfda870e401a52c1f69c6881b57a729e5005dad0535f05"
 GITHUB_OWNER = "lowelltwong-alt"
 MAX_PYTHON_STATIC_PROJECTION_CHARS = 65_536
+MAX_PYTHON_STATIC_EXPRESSION_DEPTH = 64
+MAX_PYTHON_STATIC_BINDINGS = 2_048
+MAX_PYTHON_STATIC_TOTAL_CHARS = 1_048_576
 URL_CANDIDATE_PATTERN = re.compile(
     r"(?i)(?=((?:https?:|[\\/]{2})[^\s<>\[\]()\"'`]+))"
 )
@@ -245,6 +248,7 @@ def release_url_allowed(
     url: str,
     allowed_roots: set[str],
     narrative_only_root: str | None,
+    structured_private_roots: set[str] | None = None,
 ) -> bool:
     """Allow public deep links, but require exact roots for access-controlled repos."""
     parsed_result = owned_github_url_parts(url)
@@ -268,7 +272,12 @@ def release_url_allowed(
     canonical_root = roots_by_name.get(segments[1].casefold())
     if canonical_root is None:
         return False
-    if canonical_root in STRUCTURED_PRIVATE_ACCESS_URLS or canonical_root == narrative_only_root:
+    exact_root_only = (
+        STRUCTURED_PRIVATE_ACCESS_URLS
+        if structured_private_roots is None
+        else structured_private_roots
+    )
+    if canonical_root in exact_root_only or canonical_root == narrative_only_root:
         if url != canonical_root:
             return False
         if canonical_root == narrative_only_root:
@@ -294,7 +303,7 @@ def python_literal_projections(
     relative: Path,
     errors: list[str],
 ) -> list[str]:
-    """Return Python-decoded static text without executing tracked source."""
+    """Return bounded Python-decoded static text without executing tracked source."""
     try:
         tree = ast.parse(source, filename=str(relative))
     except (SyntaxError, ValueError) as error:
@@ -315,8 +324,58 @@ def python_literal_projections(
         if full_message not in errors:
             fail(errors, full_message)
 
-    def static_formatted_text(node: ast.FormattedValue) -> str | None:
-        value = static_value(node.value)
+    projections: set[str] = set()
+    projection_chars = 0
+
+    def add_projection(value: object) -> None:
+        nonlocal projection_chars
+        if isinstance(value, bytes):
+            text = value.decode("latin-1")
+        elif isinstance(value, str):
+            text = value
+        else:
+            return
+        if text in projections:
+            return
+        if projection_chars + len(text) > MAX_PYTHON_STATIC_TOTAL_CHARS:
+            projection_failure("total static projections exceed the bounded character budget")
+            return
+        projections.add(text)
+        projection_chars += len(text)
+
+    def stored_text_size(environment: dict[str, object]) -> int:
+        return sum(
+            len(value)
+            for value in environment.values()
+            if isinstance(value, (str, bytes))
+        )
+
+    def bind_name(environment: dict[str, object], name: str, value: object) -> None:
+        if type(value) not in safe_scalar_types:
+            environment.pop(name, None)
+            return
+        if isinstance(value, (str, bytes)) and len(value) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+            projection_failure("static binding exceeds the bounded projection limit")
+            environment.pop(name, None)
+            return
+        if name not in environment and len(environment) >= MAX_PYTHON_STATIC_BINDINGS:
+            projection_failure("static binding count exceeds the bounded environment limit")
+            return
+        previous = environment.get(name)
+        environment[name] = value
+        if stored_text_size(environment) > MAX_PYTHON_STATIC_TOTAL_CHARS:
+            projection_failure("static bindings exceed the bounded character budget")
+            if previous is None:
+                environment.pop(name, None)
+            else:
+                environment[name] = previous
+
+    def static_formatted_text(
+        node: ast.FormattedValue,
+        environment: dict[str, object],
+        depth: int,
+    ) -> str | None:
+        value = static_value(node.value, environment, depth + 1)
         if type(value) not in safe_scalar_types:
             return None
         if node.conversion == ord("s"):
@@ -327,7 +386,11 @@ def python_literal_projections(
             value = ascii(value)
         elif node.conversion != -1:
             return None
-        format_spec = "" if node.format_spec is None else static_value(node.format_spec)
+        format_spec = (
+            ""
+            if node.format_spec is None
+            else static_value(node.format_spec, environment, depth + 1)
+        )
         if not isinstance(format_spec, str):
             return None
 
@@ -361,7 +424,12 @@ def python_literal_projections(
 
     def static_value(
         node: ast.AST,
+        environment: dict[str, object],
+        depth: int = 0,
     ) -> str | bytes | int | float | complex | bool | None:
+        if depth > MAX_PYTHON_STATIC_EXPRESSION_DEPTH:
+            projection_failure("static expression exceeds the bounded evaluation depth")
+            return None
         if isinstance(node, ast.Constant) and type(node.value) in {
             str,
             bytes,
@@ -371,11 +439,13 @@ def python_literal_projections(
             bool,
         }:
             return node.value
+        if isinstance(node, ast.Name):
+            return environment.get(node.id)
         if isinstance(node, ast.JoinedStr):
             values = [
-                (static_formatted_text(value) or "")
+                (static_formatted_text(value, environment, depth + 1) or "")
                 if isinstance(value, ast.FormattedValue)
-                else static_value(value)
+                else static_value(value, environment, depth + 1)
                 for value in node.values
             ]
             if values and all(isinstance(value, str) for value in values):
@@ -386,8 +456,8 @@ def python_literal_projections(
                 return joined
             return None
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-            left = static_value(node.left)
-            right = static_value(node.right)
+            left = static_value(node.left, environment, depth + 1)
+            right = static_value(node.right, environment, depth + 1)
             if isinstance(left, str) and isinstance(right, str):
                 joined = left + right
                 if len(joined) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
@@ -403,15 +473,239 @@ def python_literal_projections(
             numeric_types = {int, float, complex}
             if type(left) in numeric_types and type(right) in numeric_types:
                 return left + right
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
+            left = static_value(node.left, environment, depth + 1)
+            right = static_value(node.right, environment, depth + 1)
+            if isinstance(left, (str, bytes)) and type(right) is int:
+                if right < 0:
+                    return left[:0]
+                if len(left) and right > MAX_PYTHON_STATIC_PROJECTION_CHARS // len(left):
+                    projection_failure("static sequence multiplication exceeds the bounded projection limit")
+                    return None
+                return left * right
+            if type(left) is int and isinstance(right, (str, bytes)):
+                if left < 0:
+                    return right[:0]
+                if len(right) and left > MAX_PYTHON_STATIC_PROJECTION_CHARS // len(right):
+                    projection_failure("static sequence multiplication exceeds the bounded projection limit")
+                    return None
+                return right * left
+        if isinstance(node, ast.IfExp):
+            condition = static_value(node.test, environment, depth + 1)
+            if type(condition) in safe_scalar_types:
+                branch = node.body if bool(condition) else node.orelse
+                return static_value(branch, environment, depth + 1)
+        if isinstance(node, ast.NamedExpr):
+            return static_value(node.value, environment, depth + 1)
         return None
 
-    projections: set[str] = set()
-    for node in ast.walk(tree):
-        value = static_value(node)
-        if isinstance(value, bytes):
-            projections.add(value.decode("latin-1"))
-        elif isinstance(value, str):
-            projections.add(value)
+    nested_scopes = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+
+    def inspect_expression(node: ast.AST | None, environment: dict[str, object]) -> None:
+        if node is None:
+            return
+        named_expressions: list[ast.NamedExpr] = []
+
+        def visit(candidate: ast.AST, depth: int, collect_named: bool) -> None:
+            if depth > MAX_PYTHON_STATIC_EXPRESSION_DEPTH:
+                projection_failure("expression traversal exceeds the bounded depth")
+                return
+            if isinstance(candidate, ast.Lambda):
+                if not collect_named:
+                    return
+                for default in candidate.args.defaults:
+                    inspect_expression(default, environment)
+                for default in candidate.args.kw_defaults:
+                    inspect_expression(default, environment)
+                inspect_expression(candidate.body, {})
+                return
+            add_projection(static_value(candidate, environment, depth))
+            if collect_named and isinstance(candidate, ast.NamedExpr):
+                named_expressions.append(candidate)
+            if depth and isinstance(candidate, nested_scopes):
+                return
+            for child in ast.iter_child_nodes(candidate):
+                visit(child, depth + 1, collect_named)
+
+        visit(node, 0, True)
+        for candidate in named_expressions:
+            if isinstance(candidate.target, ast.Name):
+                value = static_value(candidate.value, environment)
+                add_projection(value)
+                bind_name(environment, candidate.target.id, value)
+        visit(node, 0, False)
+
+    def target_names(target: ast.AST) -> set[str]:
+        if isinstance(target, ast.Name):
+            return {target.id}
+        if isinstance(target, ast.Starred):
+            return target_names(target.value)
+        if isinstance(target, (ast.Tuple, ast.List)):
+            return set().union(*(target_names(item) for item in target.elts)) if target.elts else set()
+        return set()
+
+    def invalidate_target(environment: dict[str, object], target: ast.AST) -> None:
+        for name in target_names(target):
+            environment.pop(name, None)
+
+    def merge_environments(environments: list[dict[str, object]]) -> dict[str, object]:
+        if not environments:
+            return {}
+        common_names = set(environments[0])
+        for environment in environments[1:]:
+            common_names &= set(environment)
+        return {
+            name: environments[0][name]
+            for name in common_names
+            if all(
+                type(environment[name]) is type(environments[0][name])
+                and environment[name] == environments[0][name]
+                for environment in environments[1:]
+            )
+        }
+
+    def inspect_function_header(
+        statement: ast.FunctionDef | ast.AsyncFunctionDef,
+        environment: dict[str, object],
+    ) -> None:
+        for decorator in statement.decorator_list:
+            inspect_expression(decorator, environment)
+        positional = statement.args.posonlyargs + statement.args.args + statement.args.kwonlyargs
+        for argument in positional:
+            inspect_expression(argument.annotation, environment)
+        if statement.args.vararg is not None:
+            inspect_expression(statement.args.vararg.annotation, environment)
+        if statement.args.kwarg is not None:
+            inspect_expression(statement.args.kwarg.annotation, environment)
+        for default in statement.args.defaults:
+            inspect_expression(default, environment)
+        for default in statement.args.kw_defaults:
+            inspect_expression(default, environment)
+        inspect_expression(statement.returns, environment)
+
+    def analyze_block(
+        statements: list[ast.stmt],
+        initial_environment: dict[str, object],
+    ) -> dict[str, object]:
+        environment = dict(initial_environment)
+        for statement in statements:
+            if isinstance(statement, ast.Assign):
+                inspect_expression(statement.value, environment)
+                value = static_value(statement.value, environment)
+                add_projection(value)
+                for target in statement.targets:
+                    if isinstance(target, ast.Name):
+                        bind_name(environment, target.id, value)
+                    else:
+                        invalidate_target(environment, target)
+            elif isinstance(statement, ast.AnnAssign):
+                inspect_expression(statement.annotation, environment)
+                inspect_expression(statement.value, environment)
+                value = static_value(statement.value, environment) if statement.value is not None else None
+                add_projection(value)
+                if isinstance(statement.target, ast.Name):
+                    bind_name(environment, statement.target.id, value)
+                else:
+                    invalidate_target(environment, statement.target)
+            elif isinstance(statement, ast.AugAssign):
+                inspect_expression(statement.target, environment)
+                inspect_expression(statement.value, environment)
+                combined = ast.BinOp(left=statement.target, op=statement.op, right=statement.value)
+                value = static_value(combined, environment)
+                add_projection(value)
+                if isinstance(statement.target, ast.Name):
+                    bind_name(environment, statement.target.id, value)
+                else:
+                    invalidate_target(environment, statement.target)
+            elif isinstance(statement, ast.Expr):
+                inspect_expression(statement.value, environment)
+            elif isinstance(statement, (ast.Return, ast.Yield, ast.YieldFrom)):
+                inspect_expression(statement.value, environment)
+            elif isinstance(statement, ast.Raise):
+                inspect_expression(statement.exc, environment)
+                inspect_expression(statement.cause, environment)
+            elif isinstance(statement, ast.Assert):
+                inspect_expression(statement.test, environment)
+                inspect_expression(statement.msg, environment)
+            elif isinstance(statement, ast.Delete):
+                for target in statement.targets:
+                    invalidate_target(environment, target)
+            elif isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                inspect_function_header(statement, environment)
+                analyze_block(statement.body, {})
+                environment.pop(statement.name, None)
+            elif isinstance(statement, ast.ClassDef):
+                for base in statement.bases:
+                    inspect_expression(base, environment)
+                for keyword in statement.keywords:
+                    inspect_expression(keyword.value, environment)
+                for decorator in statement.decorator_list:
+                    inspect_expression(decorator, environment)
+                analyze_block(statement.body, {})
+                environment.pop(statement.name, None)
+            elif isinstance(statement, ast.If):
+                inspect_expression(statement.test, environment)
+                body_environment = analyze_block(statement.body, environment)
+                else_environment = analyze_block(statement.orelse, environment)
+                environment = merge_environments([body_environment, else_environment])
+            elif isinstance(statement, (ast.For, ast.AsyncFor)):
+                inspect_expression(statement.iter, environment)
+                body_seed = dict(environment)
+                invalidate_target(body_seed, statement.target)
+                body_environment = analyze_block(statement.body, body_seed)
+                else_environment = analyze_block(statement.orelse, environment)
+                environment = merge_environments([environment, body_environment, else_environment])
+            elif isinstance(statement, ast.While):
+                inspect_expression(statement.test, environment)
+                body_environment = analyze_block(statement.body, environment)
+                else_environment = analyze_block(statement.orelse, environment)
+                environment = merge_environments([environment, body_environment, else_environment])
+            elif isinstance(statement, (ast.With, ast.AsyncWith)):
+                body_seed = dict(environment)
+                for item in statement.items:
+                    inspect_expression(item.context_expr, environment)
+                    if item.optional_vars is not None:
+                        invalidate_target(body_seed, item.optional_vars)
+                body_environment = analyze_block(statement.body, body_seed)
+                environment = merge_environments([environment, body_environment])
+            elif isinstance(statement, (ast.Try, getattr(ast, "TryStar", ast.Try))):
+                body_environment = analyze_block(statement.body, environment)
+                exit_environments = [body_environment]
+                for handler in statement.handlers:
+                    handler_environment = dict(environment)
+                    inspect_expression(handler.type, handler_environment)
+                    if handler.name:
+                        handler_environment.pop(handler.name, None)
+                    exit_environments.append(analyze_block(handler.body, handler_environment))
+                if statement.orelse:
+                    exit_environments.append(analyze_block(statement.orelse, body_environment))
+                merged = merge_environments(exit_environments)
+                environment = analyze_block(statement.finalbody, merged)
+            elif isinstance(statement, ast.Match):
+                inspect_expression(statement.subject, environment)
+                case_environments = [dict(environment)]
+                for case in statement.cases:
+                    case_environment = dict(environment)
+                    inspect_expression(case.guard, case_environment)
+                    case_environments.append(analyze_block(case.body, case_environment))
+                environment = merge_environments(case_environments)
+            elif isinstance(statement, (ast.Import, ast.ImportFrom)):
+                for alias in statement.names:
+                    environment.pop(alias.asname or alias.name.split(".", 1)[0], None)
+            elif isinstance(statement, (ast.Global, ast.Nonlocal)):
+                for name in statement.names:
+                    environment.pop(name, None)
+            else:
+                for _, field_value in ast.iter_fields(statement):
+                    if isinstance(field_value, ast.expr):
+                        inspect_expression(field_value, environment)
+                    elif isinstance(field_value, list):
+                        for item in field_value:
+                            if isinstance(item, ast.expr):
+                                inspect_expression(item, environment)
+        return environment
+
+    analyze_block(tree.body, {})
     return sorted(projections)
 
 
@@ -519,7 +813,6 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         (Path("README.md"), narrative_only_root.replace("https://", "http://") + "/tree/secret", False, "narrative-only insecure scheme"),
         (Path("README.md"), f"{narrative_only_root}/", False, "narrative-only trailing slash"),
         (Path("registry/example.json"), DAD_URL, True, "DAD structured private route"),
-        (Path("README.md"), f"{DAD_URL}/tree/secret-review-branch", False, "DAD branch suffix"),
         (Path("README.md"), f"{public_root}/blob/abc123/README.md", True, "public repository blob path"),
         (Path("README.md"), f"{public_root}/tree/main", True, "public repository tree path"),
         (Path("README.md"), f"{public_root}-evil/tree/main", False, "repository segment boundary"),
@@ -533,6 +826,16 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             fail(errors, f"access URL extraction regression: {label}")
         elif release_url_allowed(relative, extracted[0], allowed_roots, narrative_only_root) is not expected:
             fail(errors, f"access URL policy regression: {label}")
+    structured_private_example = "https://github.com/lowelltwong-alt/private-access-example"
+    structured_private_deep = f"{structured_private_example}/tree/secret-review-branch"
+    if release_url_allowed(
+        Path("registry/example.json"),
+        structured_private_deep,
+        allowed_roots | {structured_private_example},
+        narrative_only_root,
+        {structured_private_example},
+    ):
+        fail(errors, "structured private deep-route policy regression")
     encoded_identifier = "".join(f"\\u{ord(character):04x}" for character in repository_name)
     if not has_noncanonical_narrative_identifier(encoded_identifier, narrative_only_root):
         fail(errors, "serialized narrative-only identifier regression")
@@ -590,6 +893,63 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             + '"',
             "Python conservatively empty dynamic-field f-string",
         ),
+        (
+            f'first = "{first_octal_half}"\n'
+            + 'middle = ""\n'
+            + f'second = "{second_octal_half}"\n'
+            + 'candidate = first + middle + second',
+            "Python name-bound constant concatenation",
+        ),
+        (
+            'first = "superseded"\n'
+            + f'first = "{first_octal_half}"\n'
+            + f'second = "{second_octal_half}"\n'
+            + 'candidate = first + second',
+            "Python latest-assignment concatenation",
+        ),
+        (
+            f'first = "{first_octal_half}"\n'
+            + 'alias = first\n'
+            + f'second = "{second_octal_half}"\n'
+            + 'candidate = alias + second',
+            "Python materialized alias concatenation",
+        ),
+        (
+            f'first = "{first_octal_half}"\n'
+            + 'if runtime_condition:\n    middle = ""\nelse:\n    middle = ""\n'
+            + f'second = "{second_octal_half}"\n'
+            + 'candidate = first + middle + second',
+            "Python identical-branch concatenation",
+        ),
+        (
+            f'first = "{first_octal_half}"\n'
+            + f'second = "{second_octal_half}"\n'
+            + 'candidate = f"{first}{second}"',
+            "Python name-bound f-string",
+        ),
+        (
+            f'first = "{first_octal_half}"\n'
+            + 'poison = lambda: (first := "superseded")\n'
+            + f'second = "{second_octal_half}"\n'
+            + 'candidate = first + second',
+            "Python lambda-local walrus isolation",
+        ),
+        (
+            'build = lambda: ('
+            + f'(first := "{first_octal_half}"), '
+            + f'(second := "{second_octal_half}"), '
+            + 'first + second)',
+            "Python lambda walrus descendant reprojection",
+        ),
+        (
+            'first = ""\n'
+            + 'build = lambda ignored=('
+            + f'first := "superseded" if first else "{first_octal_half}"'
+            + '): ignored\n'
+            + f'second = "{second_octal_half}"\n'
+            + 'candidate = first + second',
+            "Python single-evaluation lambda default",
+        ),
         (f'candidate = "{named_unicode_deep_url}"', "Python named-Unicode string"),
     )
     for source, label in python_literal_cases:
@@ -605,6 +965,32 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     )
     if private_deep_url in raw_projections:
         fail(errors, "Python raw-string privacy projection regression")
+    scope_control_cases = (
+        (
+            f'first = "{first_octal_half}"\n'
+            + 'def build(first):\n'
+            + f'    second = "{second_octal_half}"\n'
+            + '    candidate = first + second',
+            "function parameter shadow",
+        ),
+        (
+            'def first_scope():\n'
+            + f'    first = "{first_octal_half}"\n'
+            + 'def second_scope():\n'
+            + f'    second = "{second_octal_half}"\n'
+            + '    candidate = first + second',
+            "sibling function isolation",
+        ),
+        (
+            'first = second\nsecond = first\ncandidate = first + second',
+            "forward-reference cycle",
+        ),
+    )
+    for source, label in scope_control_cases:
+        control_errors: list[str] = []
+        projections = python_literal_projections(source, Path("example.py"), control_errors)
+        if control_errors or private_deep_url in projections:
+            fail(errors, f"Python scope isolation regression: {label}")
     malformed_errors: list[str] = []
     python_literal_projections(
         r'candidate = "\N{NOT A UNICODE NAME}"',

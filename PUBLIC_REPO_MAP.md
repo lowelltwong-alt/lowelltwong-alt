@@ -1,6 +1,6 @@
 # Public Repository Map
 
-Canonical registry projection, observed from the anonymous GitHub API on 2026-08-27: **17 public repositories**. Detailed claim proof lives in `registry/profile-repo-routing-registry.json`; each target repository's README, TOC, source, and validation artifacts remain authoritative.
+Canonical registry projection, observed from the anonymous GitHub API on 2026-08-31: **17 public repositories**. Detailed claim proof lives in `registry/profile-repo-routing-registry.json`; each target repository's README, TOC, source, and validation artifacts remain authoritative.
 
 | Repository | Delivery | Maturity | Priority | Route |
 |---|---|---|---|---|
