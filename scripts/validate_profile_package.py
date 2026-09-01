@@ -47,6 +47,7 @@ GITHUB_OWNER = "lowelltwong-alt"
 MAX_PYTHON_STATIC_PROJECTION_CHARS = 65_536
 MAX_PYTHON_STATIC_EXPRESSION_DEPTH = 64
 MAX_PYTHON_STATIC_BINDINGS = 2_048
+MAX_PYTHON_STATIC_SEQUENCE_ITEMS = 2_048
 MAX_PYTHON_STATIC_TOTAL_CHARS = 1_048_576
 URL_CANDIDATE_PATTERN = re.compile(
     r"(?i)(?=((?:https?:|[\\/]{2})[^\s<>\[\]()\"'`]+))"
@@ -327,8 +328,30 @@ def python_literal_projections(
     projections: set[str] = set()
     projection_chars = 0
 
+    def is_safe_materialized(value: object, depth: int = 0) -> bool:
+        if depth > MAX_PYTHON_STATIC_EXPRESSION_DEPTH:
+            return False
+        if type(value) in safe_scalar_types:
+            return True
+        return (
+            isinstance(value, tuple)
+            and len(value) <= MAX_PYTHON_STATIC_SEQUENCE_ITEMS
+            and all(is_safe_materialized(item, depth + 1) for item in value)
+        )
+
+    def materialized_text_size(value: object) -> int:
+        if isinstance(value, (str, bytes)):
+            return len(value)
+        if isinstance(value, tuple):
+            return sum(materialized_text_size(item) for item in value)
+        return 0
+
     def add_projection(value: object) -> None:
         nonlocal projection_chars
+        if isinstance(value, tuple):
+            for item in value:
+                add_projection(item)
+            return
         if isinstance(value, bytes):
             text = value.decode("latin-1")
         elif isinstance(value, str):
@@ -344,17 +367,18 @@ def python_literal_projections(
         projection_chars += len(text)
 
     def stored_text_size(environment: dict[str, object]) -> int:
-        return sum(
-            len(value)
-            for value in environment.values()
-            if isinstance(value, (str, bytes))
-        )
+        return sum(materialized_text_size(value) for value in environment.values())
+
+    def static_sequence_multiplier(value: object) -> int | None:
+        if type(value) in {int, bool}:
+            return int(value)
+        return None
 
     def bind_name(environment: dict[str, object], name: str, value: object) -> None:
-        if type(value) not in safe_scalar_types:
+        if not is_safe_materialized(value):
             environment.pop(name, None)
             return
-        if isinstance(value, (str, bytes)) and len(value) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+        if materialized_text_size(value) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
             projection_failure("static binding exceeds the bounded projection limit")
             environment.pop(name, None)
             return
@@ -426,7 +450,7 @@ def python_literal_projections(
         node: ast.AST,
         environment: dict[str, object],
         depth: int = 0,
-    ) -> str | bytes | int | float | complex | bool | None:
+    ) -> object | None:
         if depth > MAX_PYTHON_STATIC_EXPRESSION_DEPTH:
             projection_failure("static expression exceeds the bounded evaluation depth")
             return None
@@ -439,8 +463,32 @@ def python_literal_projections(
             bool,
         }:
             return node.value
+        if isinstance(node, (ast.Tuple, ast.List)):
+            if len(node.elts) > MAX_PYTHON_STATIC_SEQUENCE_ITEMS:
+                projection_failure("static sequence exceeds the bounded item limit")
+                return None
+            values = tuple(
+                static_value(item, environment, depth + 1)
+                for item in node.elts
+            )
+            if all(is_safe_materialized(value) for value in values):
+                return values
+            return None
         if isinstance(node, ast.Name):
             return environment.get(node.id)
+        if isinstance(node, ast.UnaryOp):
+            operand = static_value(node.operand, environment, depth + 1)
+            if isinstance(node.op, ast.Not) and is_safe_materialized(operand):
+                return not bool(operand)
+            if type(operand) in {int, bool}:
+                normalized = int(operand)
+                if isinstance(node.op, ast.UAdd):
+                    return normalized
+                if isinstance(node.op, ast.USub):
+                    return -normalized
+                if isinstance(node.op, ast.Invert):
+                    return ~normalized
+            return None
         if isinstance(node, ast.JoinedStr):
             values = [
                 (static_formatted_text(value, environment, depth + 1) or "")
@@ -470,26 +518,77 @@ def python_literal_projections(
                     projection_failure("static bytes addition exceeds the bounded projection limit")
                     return None
                 return joined
+            if isinstance(left, tuple) and isinstance(right, tuple):
+                joined = left + right
+                if (
+                    len(joined) > MAX_PYTHON_STATIC_SEQUENCE_ITEMS
+                    or materialized_text_size(joined) > MAX_PYTHON_STATIC_PROJECTION_CHARS
+                ):
+                    projection_failure("static tuple addition exceeds the bounded projection limit")
+                    return None
+                return joined
             numeric_types = {int, float, complex}
             if type(left) in numeric_types and type(right) in numeric_types:
                 return left + right
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
             left = static_value(node.left, environment, depth + 1)
             right = static_value(node.right, environment, depth + 1)
-            if isinstance(left, (str, bytes)) and type(right) is int:
-                if right < 0:
+            right_multiplier = static_sequence_multiplier(right)
+            left_multiplier = static_sequence_multiplier(left)
+            left_is_sequence = isinstance(left, (str, bytes, tuple))
+            right_is_sequence = isinstance(right, (str, bytes, tuple))
+            if (left_is_sequence and right is None) or (
+                right_is_sequence and left is None
+            ):
+                projection_failure("static sequence multiplication has an unresolved multiplier")
+                return None
+            if (right_multiplier is not None and left is None) or (
+                left_multiplier is not None and right is None
+            ):
+                projection_failure("static multiplication has an unresolved sequence operand")
+                return None
+            if isinstance(left, (str, bytes)) and right_multiplier is not None:
+                if right_multiplier <= 0 or not left:
                     return left[:0]
-                if len(left) and right > MAX_PYTHON_STATIC_PROJECTION_CHARS // len(left):
+                if right_multiplier > MAX_PYTHON_STATIC_PROJECTION_CHARS // len(left):
                     projection_failure("static sequence multiplication exceeds the bounded projection limit")
                     return None
-                return left * right
-            if type(left) is int and isinstance(right, (str, bytes)):
-                if left < 0:
+                return left * right_multiplier
+            if left_multiplier is not None and isinstance(right, (str, bytes)):
+                if left_multiplier <= 0 or not right:
                     return right[:0]
-                if len(right) and left > MAX_PYTHON_STATIC_PROJECTION_CHARS // len(right):
+                if left_multiplier > MAX_PYTHON_STATIC_PROJECTION_CHARS // len(right):
                     projection_failure("static sequence multiplication exceeds the bounded projection limit")
                     return None
-                return right * left
+                return right * left_multiplier
+            if isinstance(left, tuple) and right_multiplier is not None:
+                if right_multiplier <= 0 or not left:
+                    return ()
+                text_size = materialized_text_size(left)
+                if (
+                    right_multiplier > MAX_PYTHON_STATIC_SEQUENCE_ITEMS // len(left)
+                    or (
+                        text_size
+                        and right_multiplier > MAX_PYTHON_STATIC_PROJECTION_CHARS // text_size
+                    )
+                ):
+                    projection_failure("static tuple multiplication exceeds the bounded projection limit")
+                    return None
+                return left * right_multiplier
+            if left_multiplier is not None and isinstance(right, tuple):
+                if left_multiplier <= 0 or not right:
+                    return ()
+                text_size = materialized_text_size(right)
+                if (
+                    left_multiplier > MAX_PYTHON_STATIC_SEQUENCE_ITEMS // len(right)
+                    or (
+                        text_size
+                        and left_multiplier > MAX_PYTHON_STATIC_PROJECTION_CHARS // text_size
+                    )
+                ):
+                    projection_failure("static tuple multiplication exceeds the bounded projection limit")
+                    return None
+                return right * left_multiplier
         if isinstance(node, ast.IfExp):
             condition = static_value(node.test, environment, depth + 1)
             if type(condition) in safe_scalar_types:
@@ -548,6 +647,54 @@ def python_literal_projections(
         for name in target_names(target):
             environment.pop(name, None)
 
+    def bind_assignment_target(
+        environment: dict[str, object],
+        target: ast.AST,
+        value: object,
+    ) -> None:
+        if isinstance(target, ast.Name):
+            bind_name(environment, target.id, value)
+            return
+        if isinstance(target, ast.Starred):
+            bind_assignment_target(environment, target.value, value)
+            return
+        if not isinstance(target, (ast.Tuple, ast.List)) or not isinstance(value, tuple):
+            invalidate_target(environment, target)
+            return
+        starred_indexes = [
+            index
+            for index, item in enumerate(target.elts)
+            if isinstance(item, ast.Starred)
+        ]
+        if not starred_indexes:
+            if len(target.elts) != len(value):
+                invalidate_target(environment, target)
+                return
+            for item, item_value in zip(target.elts, value):
+                bind_assignment_target(environment, item, item_value)
+            return
+        if len(starred_indexes) != 1:
+            invalidate_target(environment, target)
+            return
+        starred_index = starred_indexes[0]
+        trailing_count = len(target.elts) - starred_index - 1
+        if len(value) < starred_index + trailing_count:
+            invalidate_target(environment, target)
+            return
+        for item, item_value in zip(target.elts[:starred_index], value[:starred_index]):
+            bind_assignment_target(environment, item, item_value)
+        bind_assignment_target(
+            environment,
+            target.elts[starred_index],
+            value[starred_index:len(value) - trailing_count if trailing_count else None],
+        )
+        if trailing_count:
+            for item, item_value in zip(
+                target.elts[-trailing_count:],
+                value[-trailing_count:],
+            ):
+                bind_assignment_target(environment, item, item_value)
+
     def merge_environments(environments: list[dict[str, object]]) -> dict[str, object]:
         if not environments:
             return {}
@@ -594,19 +741,13 @@ def python_literal_projections(
                 value = static_value(statement.value, environment)
                 add_projection(value)
                 for target in statement.targets:
-                    if isinstance(target, ast.Name):
-                        bind_name(environment, target.id, value)
-                    else:
-                        invalidate_target(environment, target)
+                    bind_assignment_target(environment, target, value)
             elif isinstance(statement, ast.AnnAssign):
                 inspect_expression(statement.annotation, environment)
                 inspect_expression(statement.value, environment)
                 value = static_value(statement.value, environment) if statement.value is not None else None
                 add_projection(value)
-                if isinstance(statement.target, ast.Name):
-                    bind_name(environment, statement.target.id, value)
-                else:
-                    invalidate_target(environment, statement.target)
+                bind_assignment_target(environment, statement.target, value)
             elif isinstance(statement, ast.AugAssign):
                 inspect_expression(statement.target, environment)
                 inspect_expression(statement.value, environment)
@@ -950,6 +1091,73 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             + 'candidate = first + second',
             "Python single-evaluation lambda default",
         ),
+        (
+            f'prefix = "{first_octal_half}"\n'
+            + f'suffix = "{second_octal_half}"\n'
+            + 'first, second = (prefix, suffix)\n'
+            + 'candidate = first + second',
+            "Python tuple-unpacked constant concatenation",
+        ),
+        (
+            f'pair = ("{first_octal_half}", "{second_octal_half}") * 1\n'
+            + 'first, second = pair\n'
+            + 'candidate = first + second',
+            "Python multiplied tuple-unpacked concatenation",
+        ),
+        (
+            f'pair = ("{first_octal_half}", "{second_octal_half}") * True\n'
+            + 'first, second = pair\n'
+            + 'candidate = first + second',
+            "Python Boolean-right-multiplied tuple concatenation",
+        ),
+        (
+            f'pair = True * ("{first_octal_half}", "{second_octal_half}")\n'
+            + 'first, second = pair\n'
+            + 'candidate = first + second',
+            "Python Boolean-left-multiplied tuple concatenation",
+        ),
+        (
+            f'first = "{first_octal_half}" * True\n'
+            + f'second = "{second_octal_half}"\n'
+            + 'candidate = first + second',
+            "Python Boolean-right-multiplied string concatenation",
+        ),
+        (
+            f'first = True * "{first_octal_half}"\n'
+            + f'second = "{second_octal_half}"\n'
+            + 'candidate = first + second',
+            "Python Boolean-left-multiplied string concatenation",
+        ),
+        (
+            f'pair = ("{first_octal_half}", "{second_octal_half}") * +1\n'
+            + 'first, second = pair\n'
+            + 'candidate = first + second',
+            "Python unary-plus-right-multiplied tuple concatenation",
+        ),
+        (
+            f'pair = +1 * ("{first_octal_half}", "{second_octal_half}")\n'
+            + 'first, second = pair\n'
+            + 'candidate = first + second',
+            "Python unary-plus-left-multiplied tuple concatenation",
+        ),
+        (
+            f'pair = ("{first_octal_half}", "{second_octal_half}") * +True\n'
+            + 'first, second = pair\n'
+            + 'candidate = first + second',
+            "Python unary-plus-Boolean tuple concatenation",
+        ),
+        (
+            f'pair = ("{first_octal_half}", "{second_octal_half}") * (not False)\n'
+            + 'first, second = pair\n'
+            + 'candidate = first + second',
+            "Python Boolean-not tuple concatenation",
+        ),
+        (
+            f'pair = ("{first_octal_half}", "{second_octal_half}") * ~(-2)\n'
+            + 'first, second = pair\n'
+            + 'candidate = first + second',
+            "Python bitwise-invert tuple concatenation",
+        ),
         (f'candidate = "{named_unicode_deep_url}"', "Python named-Unicode string"),
     )
     for source, label in python_literal_cases:
@@ -957,6 +1165,30 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         projections = python_literal_projections(source, Path("example.py"), parse_errors)
         if parse_errors or private_deep_url not in projections:
             fail(errors, f"Python literal privacy projection regression: {label}")
+
+    huge_multiplier = "18446744073709551616"
+    for source, label in (
+        (f"candidate = () * {huge_multiplier}", "empty tuple multiplied on the right"),
+        (f"candidate = {huge_multiplier} * ()", "empty tuple multiplied on the left"),
+    ):
+        parse_errors = []
+        python_literal_projections(source, Path("example.py"), parse_errors)
+        if parse_errors:
+            fail(errors, f"Python bounded multiplication regression: {label}")
+
+    unresolved_multiplier_source = (
+        f'pair = ("{first_octal_half}", "{second_octal_half}") * (2 ** 0)\n'
+        + 'first, second = pair\n'
+        + 'candidate = first + second'
+    )
+    unresolved_errors: list[str] = []
+    unresolved_projections = python_literal_projections(
+        unresolved_multiplier_source,
+        Path("example.py"),
+        unresolved_errors,
+    )
+    if not unresolved_errors and private_deep_url not in unresolved_projections:
+        fail(errors, "Python unresolved sequence multiplier fail-closed regression")
 
     raw_projections = python_literal_projections(
         f'candidate = r"{octal_deep_url}"',
