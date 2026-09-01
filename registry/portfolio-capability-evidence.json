@@ -2,7 +2,7 @@
   "$schema": "schemas/portfolio-capability.schema.json",
   "schema_version": "2.0.0",
   "registry_id": "lowelltwong-alt.portfolio-capability-evidence.v3",
-  "observed_at": "2026-08-27T20:03:00Z",
+  "observed_at": "2026-08-31T18:55:09Z",
   "controlled_aliases": [
     "graph_engineering",
     "knowledge_graphs",
@@ -331,10 +331,10 @@
       "evidence_routes": [
         {
           "repository": "logos-governance-architecture",
-          "sha": "f320d8430c10f82d4fdd80567c4d533fa90c25d5",
+          "sha": "83fb2d0c1e7187a9717808f6061137f7f533d066",
           "canonical_path": "docs/governance/engineering-practice-library/simple-before-swarm.md",
-          "canonical_url": "https://github.com/lowelltwong-alt/logos-governance-architecture/blob/f320d8430c10f82d4fdd80567c4d533fa90c25d5/docs/governance/engineering-practice-library/simple-before-swarm.md",
-          "observation_time": "2026-08-27T20:26:19Z",
+          "canonical_url": "https://github.com/lowelltwong-alt/logos-governance-architecture/blob/83fb2d0c1e7187a9717808f6061137f7f533d066/docs/governance/engineering-practice-library/simple-before-swarm.md",
+          "observation_time": "2026-08-31T18:55:09Z",
           "evidence_class": "source_owned_public",
           "access_level": "anonymous_public",
           "source_owned": true,
