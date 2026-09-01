@@ -52,6 +52,7 @@ MAX_PYTHON_STATIC_PROJECTION_CHARS = 65_536
 MAX_PYTHON_STATIC_EXPRESSION_DEPTH = 64
 MAX_PYTHON_STATIC_BINDINGS = 2_048
 MAX_PYTHON_STATIC_SEQUENCE_ITEMS = 2_048
+MAX_PYTHON_STATIC_LITERAL_FRAGMENTS = 4_096
 MAX_PYTHON_STATIC_TOTAL_CHARS = 1_048_576
 MAX_STATIC_LANGUAGE_PROJECTION_CHARS = 65_536
 MAX_STATIC_JS_DESTRUCTURE_CHARS = 4_096
@@ -84,6 +85,11 @@ POWERSHELL_BACKTICK_ESCAPE = re.compile(r"`(.)", re.S)
 YAML_ESCAPED_LINE_BREAK = re.compile(r"\\(?:\r\n?|\n)[ \t]*")
 QUOTED_TEXT_LITERAL = re.compile(
     r'''(?s)"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|`((?:\\.|[^`\\])*)`'''
+)
+BROWSER_ASCII_URL_WHITESPACE = re.compile(r"[\t\r\n]+")
+HTML_ATTRIBUTE_VALUE = re.compile(
+    r'''(?is)(?<![^\s<])[^\s"'=<>/]+\s*=\s*'''
+    r'''(?:"([^"]*)"|'([^']*)'|([^\s"'`=<>]+))'''
 )
 
 STATIC_JS_CHAR_CALL = re.compile(
@@ -987,6 +993,37 @@ def normalize_url_candidate(url: str) -> str:
     return candidate
 
 
+def html_url_attribute_view(text: str) -> str:
+    """Extract normalized URL-bearing HTML attributes before global HTML decoding."""
+    attribute_values = []
+    for match in HTML_ATTRIBUTE_VALUE.finditer(text):
+        value = next(group for group in match.groups() if group is not None)
+        attribute_values.append(
+            BROWSER_ASCII_URL_WHITESPACE.sub("", normalize_privacy_text(value))
+        )
+    return " ".join(attribute_values)
+
+
+def browser_url_scan_views(text: str) -> tuple[str, ...]:
+    """Expose quoted URL views after browser ASCII-whitespace handling."""
+    def clean_quoted(match: re.Match[str]) -> str:
+        decoded = match.group(0)
+        if decoded.startswith('"'):
+            try:
+                value = json.loads(decoded)
+                if isinstance(value, str):
+                    decoded = decoded[:1] + value + decoded[-1:]
+            except json.JSONDecodeError:
+                pass
+        return BROWSER_ASCII_URL_WHITESPACE.sub("", decoded)
+
+    quoted = QUOTED_TEXT_LITERAL.sub(
+        clean_quoted,
+        text,
+    )
+    return tuple(dict.fromkeys((text, quoted)))
+
+
 def owned_github_url_parts(url: str) -> tuple[SplitResult, list[str], bool] | None:
     """Parse a GitHub URL that resolves to this account, including encoded forms."""
     candidate = normalize_url_candidate(url)
@@ -1023,35 +1060,38 @@ def iter_owned_github_urls(text: str, *, normalize_serialized: bool = True):
         (
             normalize_privacy_text(text),
             normalize_privacy_text(text, markdown_escapes=False),
+            html_url_attribute_view(text),
         )
         if normalize_serialized
         else (text,)
     )
-    seen_candidates: set[tuple[str, str, tuple[str, ...], str, str, bool]] = set()
-    for scan_text in scan_texts:
-        for match in URL_CANDIDATE_PATTERN.finditer(scan_text):
-            url = match.group(1)
-            start = match.start(1)
-            if url.startswith(("//", "\\\\")):
-                prefix = scan_text[max(0, start - 6):start].casefold()
-                if prefix.endswith(("http:", "https:")):
+    seen_candidates: set[tuple[str, str, tuple[str, ...], str, str, bool, str]] = set()
+    for serialized_view in scan_texts:
+        for scan_text in browser_url_scan_views(serialized_view):
+            for match in URL_CANDIDATE_PATTERN.finditer(scan_text):
+                url = match.group(1)
+                start = match.start(1)
+                if url.startswith(("//", "\\\\")):
+                    prefix = scan_text[max(0, start - 6):start].casefold()
+                    if prefix.endswith(("http:", "https:")):
+                        continue
+                parsed_result = owned_github_url_parts(url)
+                if parsed_result is None:
                     continue
-            parsed_result = owned_github_url_parts(url)
-            if parsed_result is None:
-                continue
-            parsed, segments, had_dot_segment = parsed_result
-            candidate_identity = (
-                parsed.scheme.casefold(),
-                parsed.netloc.casefold(),
-                tuple(segments),
-                parsed.query,
-                parsed.fragment,
-                had_dot_segment,
-            )
-            if candidate_identity in seen_candidates:
-                continue
-            seen_candidates.add(candidate_identity)
-            yield url
+                parsed, segments, had_dot_segment = parsed_result
+                candidate_identity = (
+                    parsed.scheme.casefold(),
+                    parsed.netloc.casefold(),
+                    tuple(segments),
+                    parsed.query,
+                    parsed.fragment,
+                    had_dot_segment,
+                    url,
+                )
+                if candidate_identity in seen_candidates:
+                    continue
+                seen_candidates.add(candidate_identity)
+                yield url
 
 
 def load_narrative_only_access_url(errors: list[str]) -> str | None:
@@ -1244,7 +1284,7 @@ def python_literal_projections(
                     literal_value = projected
             if literal_value is None:
                 continue
-            if len(literals) >= MAX_PYTHON_STATIC_SEQUENCE_ITEMS:
+            if len(literals) >= MAX_PYTHON_STATIC_LITERAL_FRAGMENTS:
                 projection_failure("decoded Python literal count exceeds the bounded fragment limit")
                 return
             literal = (
@@ -2559,6 +2599,61 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     protocol_relative_backslash_deep_url = (
         f"\\\\github.com\\{GITHUB_OWNER}\\{encoded_name}\\tree\\secret"
     )
+    browser_whitespace_attacks: list[str] = []
+    for codepoint in (9, 10, 13):
+        browser_whitespace_attacks.extend((
+            f'<a href="{narrative_only_root}&#{codepoint};/tree/secret">review</a>',
+            f'"{narrative_only_root}%{codepoint:02X}/tree/secret"',
+            f'<a href="{narrative_only_root}{chr(codepoint)}/tree/secret">review</a>',
+        ))
+    for separator in "&#x09;|&Tab;|&NewLine;|%2509|\\u0009".split("|"):
+        browser_whitespace_attacks.append(
+            f'"{narrative_only_root}{separator}/tree/secret"'
+        )
+    for control in "tnr":
+        browser_whitespace_attacks.append(
+            f'"{narrative_only_root}{chr(92)}{control}/tree/secret"'
+        )
+    host = urlsplit(narrative_only_root).hostname or ""
+    host_split = len(host) // 2
+    repository_split = len(repository_name) // 2
+    for separator in "&#9;|&#x09;|&Tab;|&NewLine;".split("|"):
+        obscured_host = host[:host_split] + separator + host[host_split:]
+        obscured_repository = (
+            repository_name[:repository_split]
+            + separator
+            + repository_name[repository_split:]
+        )
+        browser_whitespace_attacks.append(
+            "<a href="
+            + narrative_only_root.replace(host, obscured_host, 1).replace(
+                repository_name,
+                obscured_repository,
+                1,
+            )
+            + "/tree/secret>review</a>"
+        )
+    obscured_url = narrative_only_root.replace(
+        host,
+        host[:host_split] + "&#9;" + host[host_split:],
+        1,
+    ).replace(
+        repository_name,
+        repository_name[:repository_split] + "&#10;" + repository_name[repository_split:],
+        1,
+    )
+    browser_whitespace_attacks.extend((
+        "<video poster=" + obscured_url + "/tree/secret></video>",
+        "<object data=" + obscured_url + "/tree/secret></object>",
+    ))
+    for attribute_name in "1route|érouting|:|-|..|`|`route|route`x".split("|"):
+        browser_whitespace_attacks.append(
+            "<div "
+            + attribute_name
+            + "="
+            + obscured_url
+            + "/tree/secret></div>"
+        )
     cases = (
         (Path("README.md"), narrative_only_root, True, "narrative-only Markdown disclosure"),
         (Path("registry/example.json"), narrative_only_root, False, "narrative-only structured disclosure"),
@@ -2606,10 +2701,58 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     )
     for relative, url, expected, label in cases:
         extracted = list(iter_owned_github_urls(f"prefix {url} suffix"))
-        if len(extracted) != 1:
+        if not extracted:
             fail(errors, f"access URL extraction regression: {label}")
-        elif release_url_allowed(relative, extracted[0], allowed_roots, narrative_only_root) is not expected:
+            continue
+        policy_results = [
+            release_url_allowed(relative, candidate, allowed_roots, narrative_only_root)
+            for candidate in extracted
+        ]
+        if (expected and not all(policy_results)) or (
+            not expected and all(policy_results)
+        ):
             fail(errors, f"access URL policy regression: {label}")
+    for source in browser_whitespace_attacks:
+        extracted = list(iter_owned_github_urls(source))
+        if not extracted or all(
+            release_url_allowed(
+                Path("README.md"),
+                url,
+                allowed_roots,
+                narrative_only_root,
+            )
+            for url in extracted
+        ):
+            fail(errors, "browser ASCII URL-whitespace privacy regression")
+    ordinary_line_break = list(
+        iter_owned_github_urls(f"{narrative_only_root}\nordinary prose")
+    )
+    if ordinary_line_break != [narrative_only_root]:
+        fail(errors, "ordinary Markdown line-break URL tokenization regression")
+    for line_break in ("\n", "\r\n"):
+        separate_markdown_tokens = list(
+            iter_owned_github_urls(
+                narrative_only_root + line_break + "/tree/secret"
+            )
+        )
+        if separate_markdown_tokens != [narrative_only_root]:
+            fail(errors, "separate Markdown URL-token boundary regression")
+    for unsafe_suffix in ("/", "?", "#"):
+        candidates = list(
+            iter_owned_github_urls(
+                narrative_only_root + " " + narrative_only_root + unsafe_suffix
+            )
+        )
+        if len(candidates) != 2 or all(
+            release_url_allowed(
+                Path("README.md"),
+                url,
+                allowed_roots,
+                narrative_only_root,
+            )
+            for url in candidates
+        ):
+            fail(errors, "policy-relevant URL spelling deduplication regression")
     structured_private_example = "https://github.com/lowelltwong-alt/private-access-example"
     structured_private_deep = f"{structured_private_example}/tree/secret-review-branch"
     if release_url_allowed(
