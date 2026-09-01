@@ -379,17 +379,28 @@ def python_literal_projections(
         literals: list[str] = []
         literal_chars = 0
         for candidate in ast.walk(tree):
-            if not isinstance(candidate, ast.Constant) or not isinstance(
+            literal_value: str | bytes | None = None
+            if isinstance(candidate, ast.Constant) and isinstance(
                 candidate.value, (str, bytes)
             ):
+                literal_value = candidate.value
+            elif (
+                isinstance(candidate, ast.Call)
+                and isinstance(candidate.func, ast.Name)
+                and candidate.func.id == "chr"
+            ):
+                projected = static_value(candidate, {})
+                if isinstance(projected, str):
+                    literal_value = projected
+            if literal_value is None:
                 continue
             if len(literals) >= MAX_PYTHON_STATIC_SEQUENCE_ITEMS:
                 projection_failure("decoded Python literal count exceeds the bounded fragment limit")
                 return
             literal = (
-                candidate.value.decode("latin-1")
-                if isinstance(candidate.value, bytes)
-                else candidate.value
+                literal_value.decode("latin-1")
+                if isinstance(literal_value, bytes)
+                else literal_value
             )
             if len(literal) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
                 projection_failure("decoded Python literal exceeds the bounded fragment limit")
@@ -581,6 +592,20 @@ def python_literal_projections(
                     return None
                 return joined
             return None
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and len(node.args) == 1
+            and not node.keywords
+        ):
+            argument = static_value(node.args[0], environment, depth + 1)
+            if node.func.id == "chr" and type(argument) in {int, bool}:
+                try:
+                    return chr(int(argument))
+                except (OverflowError, ValueError):
+                    return None
+            if node.func.id == "ord" and isinstance(argument, (str, bytes)) and len(argument) == 1:
+                return ord(argument)
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
@@ -1107,6 +1132,11 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     first_octal_half = "".join(octal_parts[:octal_split])
     second_octal_half = "".join(octal_parts[octal_split:])
     named_unicode_deep_url = private_deep_url.replace("-", r"\N{HYPHEN-MINUS}")
+    character_call_source = (
+        'dash = chr(45)\n' + 'candidate = "'
+        + private_deep_url.replace("-", '" + dash + "')
+        + '"'
+    )
     python_literal_cases = (
         (f'candidate = "{octal_deep_url}"', "Python octal string"),
         (f'candidate = b"{octal_deep_url}"', "Python octal bytes"),
@@ -1277,6 +1307,7 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             + 'candidate = first + second',
             "Python bitwise-invert tuple concatenation",
         ),
+        (character_call_source, "Python static-character concatenation"),
         (f'candidate = "{named_unicode_deep_url}"', "Python named-Unicode string"),
     )
     for source, label in python_literal_cases:
@@ -1288,6 +1319,12 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     protected_split = 6
     protected_first = repository_name[:protected_split]
     protected_rest = repository_name[protected_split:]
+    protected_words = repository_name.split("-")
+    character_fragment_source = (
+        'dash = chr(45)\nparts = ('
+        + ", ".join(f'"{word}"' for word in protected_words)
+        + ',)\ncandidate = "{}".format(dash).join(parts)'
+    )
     protected_fragment_cases = (
         (
             f'parts = ("{protected_first}", "{protected_rest}")\n'
@@ -1332,6 +1369,7 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             + 'candidate = (first if 1 == 1 else "") + (second or "")',
             "comparison and Boolean selection",
         ),
+        (character_fragment_source, "static character through formatted join"),
     )
     for source, label in protected_fragment_cases:
         fragment_errors: list[str] = []
@@ -1371,6 +1409,16 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         python_literal_projections(source, Path("example.py"), parse_errors)
         if parse_errors:
             fail(errors, f"Python bounded multiplication regression: {label}")
+
+    huge_character = "9" * 100
+    for source, label in (
+        (f"candidate = chr({huge_character})", "oversized positive character"),
+        (f"candidate = chr(-{huge_character})", "oversized negative character"),
+    ):
+        character_errors: list[str] = []
+        python_literal_projections(source, Path("example.py"), character_errors)
+        if character_errors:
+            fail(errors, f"Python bounded character regression: {label}")
 
     unresolved_multiplier_source = (
         f'pair = ("{first_octal_half}", "{second_octal_half}") * (2 ** 0)\n'
