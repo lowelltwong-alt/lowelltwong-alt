@@ -94,6 +94,14 @@ STATIC_JS_BUFFER_CALL = re.compile(
     r"(?is)\bBuffer\s*\.\s*from\s*\(\s*(['\"\x60])(.*?)\1\s*,\s*"
     r"(['\"\x60])(base64|base64url|hex)\3\s*\)"
 )
+STATIC_JS_TEXT_DECODER_CALL = re.compile(
+    r"(?s)\bnew\s+TextDecoder\s*\(\s*(?:(['\"])([^'\"]{0,64})\1)?\s*\)"
+    r"\s*\.\s*decode\s*\(\s*new\s+"
+    r"(Uint8Array|Uint8ClampedArray|Int8Array)\s*\(\s*\[([^\[\]()]*)\]\s*\)\s*\)"
+)
+STATIC_JS_TEXT_DECODER_MARKER = re.compile(
+    r"(?s)\bTextDecoder\b"
+)
 STATIC_PS_CHAR_ARRAY = re.compile(
     r"(?is)\[\s*char\s*\[\s*\]\s*\]\s*(?:@\s*)?\(\s*([^()]*)\s*\)"
 )
@@ -531,6 +539,26 @@ def static_language_projections(text: str, relative: Path, errors: list[str]) ->
                 add(match, decode_bounded_static_payload(payload, match.group(4)))
             except (ValueError, UnicodeDecodeError, binascii.Error):
                 add_error("recognized JavaScript buffer decoder is unresolved or malformed")
+        for match in STATIC_JS_TEXT_DECODER_CALL.finditer(text):
+            if not executable(match):
+                continue
+            try:
+                encoding = (match.group(2) or "utf-8").casefold().replace("_", "-")
+                if encoding not in {"utf8", "utf-8"}:
+                    raise ValueError
+                values = parse_static_integer_sequence(match.group(4), language=language)
+                if match.group(3).casefold() == "uint8clampedarray":
+                    raw = bytes(min(255, max(0, value)) for value in values)
+                else:
+                    raw = bytes(value & 0xFF for value in values)
+                add(match, raw.decode("utf-8", errors="replace"))
+            except (ValueError, UnicodeDecodeError):
+                add_error("recognized JavaScript typed-array decoder is unresolved or malformed")
+        for marker in STATIC_JS_TEXT_DECODER_MARKER.finditer(text):
+            if not executable(marker):
+                continue
+            if not any(start <= marker.start() < end for start, end in covered_spans):
+                add_error("recognized JavaScript text decoder is unresolved or malformed")
     else:
         for match in STATIC_PS_CHAR_ARRAY.finditer(text):
             if not executable(match):
@@ -3174,6 +3202,12 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     )
     private_hexadecimal = private_deep_bytes.hex()
     template_delimiter = chr(96)
+    clamped_negative_code_text = ", ".join(
+        str(value - 256) for value in private_codes
+    )
+    clamped_positive_code_text = ", ".join(
+        str(value + 256) for value in private_codes
+    )
 
     static_language_attacks = (
         (
@@ -3305,6 +3339,20 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             "JavaScript explicit hexadecimal buffer",
         ),
         (
+            "const candidate = new TextDecoder().decode(new Uint8Array(["
+            + private_code_text
+            + "]));",
+            ".ts",
+            "JavaScript typed-array text decoder",
+        ),
+        (
+            "const candidate = (new TextDecoder).decode(new Uint8Array(["
+            + private_code_text
+            + "]));",
+            ".js",
+            "JavaScript no-parentheses text decoder",
+        ),
+        (
             f"$candidate = [char[]]({private_code_text}) -join ''",
             ".ps1",
             "PowerShell character array",
@@ -3393,6 +3441,42 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             "JavaScript regex documentation",
         ),
         (
+            "const ordinary = new TextDecoder().decode(new Uint8Array([65,66,67]));",
+            ".js",
+            "ordinary JavaScript typed-array decoder",
+        ),
+        (
+            "const ordinary = new TextDecoder().decode(new Uint8ClampedArray(["
+            + clamped_negative_code_text
+            + "]));",
+            ".js",
+            "JavaScript negative clamped-array semantics",
+        ),
+        (
+            "const ordinary = new TextDecoder().decode(new Uint8ClampedArray(["
+            + clamped_positive_code_text
+            + "]));",
+            ".js",
+            "JavaScript over-255 clamped-array semantics",
+        ),
+        (
+            "const ordinary = textdecoder(runtimeBytes);",
+            ".js",
+            "JavaScript case-sensitive decoder identifier",
+        ),
+        (
+            f"const bytes = new Uint8Array([{private_code_text}]);",
+            ".js",
+            "ordinary JavaScript typed array without decoder",
+        ),
+        (
+            "// new TextDecoder().decode(new Uint8Array(["
+            + private_code_text
+            + "]))",
+            ".js",
+            "JavaScript typed-array decoder comment",
+        ),
+        (
             f"# [char[]]({private_code_text})",
             ".ps1",
             "PowerShell line comment",
@@ -3429,6 +3513,21 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         ("String.fromCodePoint(1114112);", ".js", "invalid JavaScript code point"),
         ("String.fromCharCode();", ".js", "empty JavaScript character call"),
         ("String.fromCharCode(runtimeValue);", ".js", "unresolved JavaScript character call"),
+        (
+            "new TextDecoder().decode(runtimeBytes);",
+            ".js",
+            "unresolved JavaScript text decoder",
+        ),
+        (
+            "new TextDecoder('utf-16').decode(new Uint8Array([65,66]));",
+            ".js",
+            "unsupported JavaScript text-decoder encoding",
+        ),
+        (
+            "new TextDecoder('ascii').decode(new Uint8Array([128]));",
+            ".js",
+            "unsupported WHATWG alias encoding",
+        ),
         (
             precision_attack_source,
             ".js",
