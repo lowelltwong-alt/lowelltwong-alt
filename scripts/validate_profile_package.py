@@ -303,6 +303,8 @@ def python_literal_projections(
     source: str,
     relative: Path,
     errors: list[str],
+    *,
+    protected_identifier: str | None = None,
 ) -> list[str]:
     """Return bounded Python-decoded static text without executing tracked source."""
     try:
@@ -365,6 +367,82 @@ def python_literal_projections(
             return
         projections.add(text)
         projection_chars += len(text)
+
+    def add_protected_literal_fragment_projection() -> None:
+        """Conservatively backstop common static composition over decoded literals."""
+        if protected_identifier is None:
+            return
+        target = protected_identifier.casefold()
+        if len(target) < 6:
+            projection_failure("protected Python identifier is too short for fragment analysis")
+            return
+        literals: list[str] = []
+        literal_chars = 0
+        for candidate in ast.walk(tree):
+            if not isinstance(candidate, ast.Constant) or not isinstance(
+                candidate.value, (str, bytes)
+            ):
+                continue
+            if len(literals) >= MAX_PYTHON_STATIC_SEQUENCE_ITEMS:
+                projection_failure("decoded Python literal count exceeds the bounded fragment limit")
+                return
+            literal = (
+                candidate.value.decode("latin-1")
+                if isinstance(candidate.value, bytes)
+                else candidate.value
+            )
+            if len(literal) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                projection_failure("decoded Python literal exceeds the bounded fragment limit")
+                return
+            literal = normalize_percent_escapes(literal).casefold()
+            literal_chars += len(literal)
+            if literal_chars > MAX_PYTHON_STATIC_TOTAL_CHARS:
+                projection_failure("decoded Python literals exceed the bounded fragment budget")
+                return
+            literals.append(literal)
+
+        def matching_lengths(position: int, literal: str, *, anchored: bool) -> set[int]:
+            lengths: set[int] = set()
+            remaining = target[position:]
+            for start in range(len(literal)):
+                matched = 0
+                while (
+                    matched < len(remaining)
+                    and start + matched < len(literal)
+                    and literal[start + matched] == remaining[matched]
+                ):
+                    matched += 1
+                if not matched:
+                    continue
+                minimum = 6 if not anchored else 3
+                for length in range(minimum, matched + 1):
+                    fragment = remaining[:length]
+                    if not anchored or any(character.isalnum() for character in fragment):
+                        lengths.add(length)
+                if anchored:
+                    for length in range(1, min(2, matched) + 1):
+                        fragment = remaining[:length]
+                        if all(not character.isalnum() for character in fragment):
+                            lengths.add(length)
+            return lengths
+
+        reachable = {
+            length
+            for literal in literals
+            for length in matching_lengths(0, literal, anchored=False)
+        }
+        pending = list(reachable)
+        while pending:
+            position = pending.pop()
+            if position >= len(target):
+                add_projection(protected_identifier)
+                return
+            for literal in literals:
+                for length in matching_lengths(position, literal, anchored=True):
+                    next_position = position + length
+                    if next_position not in reachable:
+                        reachable.add(next_position)
+                        pending.append(next_position)
 
     def stored_text_size(environment: dict[str, object]) -> int:
         return sum(materialized_text_size(value) for value in environment.values())
@@ -502,6 +580,36 @@ def python_literal_projections(
                     projection_failure("static f-string exceeds the bounded projection limit")
                     return None
                 return joined
+            return None
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "join"
+            and len(node.args) == 1
+            and not node.keywords
+        ):
+            separator = static_value(node.func.value, environment, depth + 1)
+            values = static_value(node.args[0], environment, depth + 1)
+            if isinstance(separator, str) and isinstance(values, tuple) and all(
+                isinstance(value, str) for value in values
+            ):
+                joined_size = materialized_text_size(values) + max(
+                    len(values) - 1, 0
+                ) * len(separator)
+                if joined_size > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                    projection_failure("static string join exceeds the bounded projection limit")
+                    return None
+                return separator.join(values)
+            if isinstance(separator, bytes) and isinstance(values, tuple) and all(
+                isinstance(value, bytes) for value in values
+            ):
+                joined_size = materialized_text_size(values) + max(
+                    len(values) - 1, 0
+                ) * len(separator)
+                if joined_size > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+                    projection_failure("static bytes join exceeds the bounded projection limit")
+                    return None
+                return separator.join(values)
             return None
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
             left = static_value(node.left, environment, depth + 1)
@@ -847,6 +955,7 @@ def python_literal_projections(
         return environment
 
     analyze_block(tree.body, {})
+    add_protected_literal_fragment_projection()
     return sorted(projections)
 
 
@@ -1105,6 +1214,16 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
             "Python multiplied tuple-unpacked concatenation",
         ),
         (
+            f'parts = ("{first_octal_half}", "{second_octal_half}")\n'
+            + 'candidate = "".join(parts)',
+            "Python name-bound constant string join",
+        ),
+        (
+            f'parts = [b"{first_octal_half}", b"{second_octal_half}"]\n'
+            + 'candidate = b"".join(parts)',
+            "Python name-bound constant bytes join",
+        ),
+        (
             f'pair = ("{first_octal_half}", "{second_octal_half}") * True\n'
             + 'first, second = pair\n'
             + 'candidate = first + second',
@@ -1165,6 +1284,83 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
         projections = python_literal_projections(source, Path("example.py"), parse_errors)
         if parse_errors or private_deep_url not in projections:
             fail(errors, f"Python literal privacy projection regression: {label}")
+
+    protected_split = 6
+    protected_first = repository_name[:protected_split]
+    protected_rest = repository_name[protected_split:]
+    protected_fragment_cases = (
+        (
+            f'parts = ("{protected_first}", "{protected_rest}")\n'
+            + 'candidate = "".join(item for item in parts)',
+            "generator join",
+        ),
+        (
+            f'parts = ("{protected_first}", "{protected_rest}")\n'
+            + 'candidate = "".join(*[parts])',
+            "starred join argument",
+        ),
+        (
+            f'parts = ("{protected_first}", "{protected_rest}")\n'
+            + 'candidate = "".join(parts[:])',
+            "sliced join iterable",
+        ),
+        (
+            f'candidate = "{{}}{{}}".format("{protected_first}", "{protected_rest}")',
+            "string format call",
+        ),
+        (
+            'candidate = "{left}{right}".format_map('
+            + f'{{"left": "{protected_first}", "right": "{protected_rest}"}})',
+            "string format-map call",
+        ),
+        (
+            f'candidate = "%s%s" % ("{protected_first}", "{protected_rest}")',
+            "percent formatting",
+        ),
+        (
+            f'candidate = "{protected_first}X{protected_rest}".replace("X", "")',
+            "string replacement",
+        ),
+        (
+            f'parts = ("{protected_first}", "{protected_rest}")\n'
+            + 'candidate = parts[0].__add__(parts[1])',
+            "indexed direct-add call",
+        ),
+        (
+            f'first = "{protected_first}"\n'
+            + f'second = "{protected_rest}"\n'
+            + 'candidate = (first if 1 == 1 else "") + (second or "")',
+            "comparison and Boolean selection",
+        ),
+    )
+    for source, label in protected_fragment_cases:
+        fragment_errors: list[str] = []
+        fragment_projections = python_literal_projections(
+            source,
+            Path("example.py"),
+            fragment_errors,
+            protected_identifier=repository_name,
+        )
+        if fragment_errors or repository_name not in fragment_projections:
+            fail(errors, f"Python protected-fragment projection regression: {label}")
+
+    raw_encoded_identifier = "".join(
+        f"\\x{ord(character):02x}" for character in repository_name
+    )
+    raw_fragment_source = f'candidate = r"{raw_encoded_identifier}"'
+    raw_fragment_projections = python_literal_projections(
+        raw_fragment_source,
+        Path("example.py"),
+        errors,
+        protected_identifier=repository_name,
+    )
+    if repository_name in raw_fragment_projections:
+        fail(errors, "Python raw literal component-projection regression")
+    if not has_noncanonical_narrative_identifier(
+        raw_fragment_source,
+        narrative_only_root,
+    ):
+        fail(errors, "Python raw literal conservative source-policy regression")
 
     huge_multiplier = "18446744073709551616"
     for source, label in (
@@ -1427,15 +1623,27 @@ def validate_release_text(
         unquote(urlsplit(root).path).rstrip("/").rsplit("/", 1)[-1].casefold(): root
         for root in private_roots
     }
+    narrative_only_identifier = (
+        unquote(urlsplit(narrative_only_root).path).rstrip("/").rsplit("/", 1)[-1]
+        if narrative_only_root is not None
+        else None
+    )
     meta_language_paths = {Path("scripts/validate_profile_package.py")}
     for path, text in tracked_texts:
         relative = path.relative_to(ROOT)
         is_meta_language = relative in meta_language_paths or relative.parts[:2] == ("registry", "schemas")
         normalized_text = normalize_release_text(text)
         urls = list(iter_owned_github_urls(text))
+        # The raw-source view is intentionally conservative: serialized private
+        # identifiers remain prohibited even when they occur inside Python raw literals.
         privacy_views = [(text, True)]
         if relative.suffix.lower() == ".py":
-            python_projections = python_literal_projections(text, relative, errors)
+            python_projections = python_literal_projections(
+                text,
+                relative,
+                errors,
+                protected_identifier=narrative_only_identifier,
+            )
             if python_projections:
                 privacy_views.append(("\n".join(python_projections), False))
         for privacy_text, normalize_serialized in privacy_views:
