@@ -90,10 +90,24 @@ def route_key(route: dict) -> tuple[str, str, str]:
 
 
 def tracked_utf8_text_files(errors: list[str]) -> list[tuple[Path, str]]:
-    """Load every Git-tracked file as UTF-8 text or fail closed for explicit handling."""
+    """Load worktree and divergent index views as UTF-8 release-candidate text."""
     try:
         result = subprocess.run(
             ["git", "-C", str(ROOT), "ls-files", "-z", "--cached"],
+            check=True,
+            capture_output=True,
+        )
+        divergent_result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(ROOT),
+                "diff",
+                "--no-ext-diff",
+                "--name-only",
+                "-z",
+                "--",
+            ],
             check=True,
             capture_output=True,
         )
@@ -101,6 +115,11 @@ def tracked_utf8_text_files(errors: list[str]) -> list[tuple[Path, str]]:
         fail(errors, f"tracked-file inventory unavailable: {error}")
         return []
 
+    divergent_paths = {
+        raw_path
+        for raw_path in divergent_result.stdout.split(b"\0")
+        if raw_path
+    }
     tracked: list[tuple[Path, str]] = []
     for raw_path in result.stdout.split(b"\0"):
         if not raw_path:
@@ -116,13 +135,30 @@ def tracked_utf8_text_files(errors: list[str]) -> list[tuple[Path, str]]:
         path = ROOT / relative
         if path.is_symlink() or not path.is_file():
             fail(errors, f"tracked file requires explicit non-regular-file handling: {relative}")
+        else:
+            try:
+                text = path.read_text(encoding="utf-8-sig")
+            except UnicodeDecodeError:
+                fail(errors, f"tracked file is not UTF-8 text and requires explicit handling: {relative}")
+            else:
+                tracked.append((path, text))
+        if raw_path not in divergent_paths:
             continue
         try:
-            text = path.read_text(encoding="utf-8-sig")
-        except UnicodeDecodeError:
-            fail(errors, f"tracked file is not UTF-8 text and requires explicit handling: {relative}")
+            index_result = subprocess.run(
+                ["git", "-C", str(ROOT), "show", f":{relative.as_posix()}"],
+                check=True,
+                capture_output=True,
+            )
+        except (OSError, subprocess.CalledProcessError) as error:
+            fail(errors, f"staged index blob is unavailable for {relative}: {error}")
             continue
-        tracked.append((path, text))
+        try:
+            index_text = index_result.stdout.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            fail(errors, f"staged index blob is not UTF-8 text: {relative}")
+            continue
+        tracked.append((path, index_text))
     return tracked
 
 
