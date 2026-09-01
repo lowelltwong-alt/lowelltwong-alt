@@ -62,10 +62,19 @@ SERIALIZED_CODEPOINT_ESCAPES = (
     re.compile(r"\\u([0-9A-Fa-f]{4})"),
     re.compile(r"\\U([0-9A-Fa-f]{8})"),
 )
-SERIALIZED_NUMERIC_ESCAPE_PREFIX = re.compile(r"\\+(?=[xuU][0-9A-Fa-f])")
+SERIALIZED_NUMERIC_ESCAPE_PREFIX = re.compile(
+    r"\\+(?=(?:[xuU][0-9A-Fa-f]|u\{[0-9A-Fa-f]))"
+)
 SERIALIZED_NAMED_UNICODE_ESCAPE = re.compile(r"\\N\{([^{}]{1,256})\}")
 SERIALIZED_OCTAL_ESCAPE = re.compile(r"\\([0-7]{1,3})")
+SERIALIZED_BRACED_UNICODE_ESCAPE = re.compile(r"\\u\{([0-9A-Fa-f]{1,6})\}")
+POWERSHELL_BRACED_UNICODE_ESCAPE = re.compile(r"`u\{([0-9A-Fa-f]{1,6})\}")
+POWERSHELL_ESCAPED_LINE_BREAK = re.compile(r"`(?:\r\n?|\n)[ \t]*")
+POWERSHELL_BACKTICK_ESCAPE = re.compile(r"`(.)", re.S)
 YAML_ESCAPED_LINE_BREAK = re.compile(r"\\(?:\r\n?|\n)[ \t]*")
+QUOTED_TEXT_LITERAL = re.compile(
+    r'''(?s)"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|`((?:\\.|[^`\\])*)`'''
+)
 
 
 def read_json(path: Path) -> dict:
@@ -194,6 +203,129 @@ def privacy_normalization_closure(text: str) -> list[str]:
             seen.add(normalized)
             pending.append(normalized)
     return sorted(seen)
+
+
+def normalize_quoted_fragment(text: str, *, language: str | None = None) -> str:
+    """Normalize bounded JavaScript and PowerShell escapes inside quoted text."""
+    powershell_controls = {
+        "0": "\0",
+        "a": "\a",
+        "b": "\b",
+        "e": "\x1b",
+        "f": "\f",
+        "n": "\n",
+        "r": "\r",
+        "t": "\t",
+        "v": "\v",
+    }
+
+    def decode_braced_codepoint(match: re.Match[str]) -> str:
+        codepoint = int(match.group(1), 16)
+        return chr(codepoint) if codepoint <= sys.maxunicode else match.group(0)
+
+    def decode_powershell_escape(match: re.Match[str]) -> str:
+        escaped = match.group(1)
+        return powershell_controls.get(escaped, escaped)
+
+    previous = None
+    while text != previous:
+        previous = text
+        text = normalize_privacy_text(text)
+        if language == "javascript":
+            text = SERIALIZED_BRACED_UNICODE_ESCAPE.sub(decode_braced_codepoint, text)
+        elif language == "powershell":
+            text = POWERSHELL_BRACED_UNICODE_ESCAPE.sub(decode_braced_codepoint, text)
+            text = POWERSHELL_ESCAPED_LINE_BREAK.sub("", text)
+            text = POWERSHELL_BACKTICK_ESCAPE.sub(decode_powershell_escape, text)
+    return text
+
+
+def quoted_fragments_cover_identifier(
+    text: str,
+    protected_identifier: str,
+    *,
+    language: str | None = None,
+) -> bool:
+    """Conservatively detect a protected identifier assembled from quoted text."""
+    target = protected_identifier.casefold()
+    if len(target) < 6:
+        raise ValueError("protected identifier is too short for fragment analysis")
+    literals: list[str] = []
+    literal_chars = 0
+    for match in QUOTED_TEXT_LITERAL.finditer(text):
+        literal = next(group for group in match.groups() if group is not None)
+        literal = normalize_quoted_fragment(literal, language=language).casefold()
+        relevant = any(
+            target[index:index + 3] in literal
+            for index in range(max(len(target) - 2, 0))
+        ) or (
+            len(literal) <= 2
+            and any(character in target for character in literal)
+        )
+        if not relevant:
+            continue
+        if len(literal) > MAX_PYTHON_STATIC_PROJECTION_CHARS:
+            raise ValueError("quoted literal exceeds the bounded fragment limit")
+        literal_chars += len(literal)
+        if (
+            len(literals) >= MAX_PYTHON_STATIC_SEQUENCE_ITEMS
+            or literal_chars > MAX_PYTHON_STATIC_TOTAL_CHARS
+        ):
+            raise ValueError("quoted literals exceed the bounded fragment budget")
+        literals.append(literal)
+
+    def matching_lengths(position: int, literal: str, *, anchored: bool) -> set[int]:
+        lengths: set[int] = set()
+        remaining = target[position:]
+        for start in range(len(literal)):
+            matched = 0
+            while (
+                matched < len(remaining)
+                and start + matched < len(literal)
+                and literal[start + matched] == remaining[matched]
+            ):
+                matched += 1
+            if not matched:
+                continue
+            minimum = 6 if not anchored else 3
+            for length in range(minimum, matched + 1):
+                fragment = remaining[:length]
+                if not anchored or any(character.isalnum() for character in fragment):
+                    lengths.add(length)
+            if anchored:
+                for length in range(1, min(2, matched) + 1):
+                    fragment = remaining[:length]
+                    if all(not character.isalnum() for character in fragment):
+                        lengths.add(length)
+        return lengths
+
+    reachable = {
+        length
+        for literal in literals
+        for length in matching_lengths(0, literal, anchored=False)
+    }
+    pending = list(reachable)
+    while pending:
+        position = pending.pop()
+        if position >= len(target):
+            return True
+        for literal in literals:
+            for length in matching_lengths(position, literal, anchored=True):
+                next_position = position + length
+                if next_position not in reachable:
+                    reachable.add(next_position)
+                    pending.append(next_position)
+    return False
+
+
+def quoted_fragment_language(path: Path) -> str | None:
+    """Select only the escape semantics owned by the tracked file family."""
+    suffix = path.suffix.casefold()
+    if suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}:
+        return "javascript"
+    if suffix in {".ps1", ".psm1", ".psd1"}:
+        return "powershell"
+    return None
 
 
 def normalize_url_candidate(url: str) -> str:
@@ -345,11 +477,24 @@ def has_noncanonical_narrative_identifier(
     narrative_only_root: str,
     *,
     normalize_serialized: bool = True,
+    scan_quoted_fragments: bool = True,
+    quoted_language: str | None = None,
 ) -> bool:
     normalized_text = normalize_privacy_text(text) if normalize_serialized else text
     repository_name = unquote(urlsplit(narrative_only_root).path).rstrip("/").rsplit("/", 1)[-1]
     text_without_approved_root = normalized_text.replace(narrative_only_root, "")
-    return repository_name.casefold() in text_without_approved_root.casefold()
+    if repository_name.casefold() in text_without_approved_root.casefold():
+        return True
+    if not normalize_serialized or not scan_quoted_fragments:
+        return False
+    try:
+        return quoted_fragments_cover_identifier(
+            text.replace(narrative_only_root, ""),
+            repository_name,
+            language=quoted_language,
+        )
+    except ValueError:
+        return True
 
 
 def python_literal_projections(
@@ -2364,6 +2509,81 @@ def validate_access_url_policy(errors: list[str], narrative_only_root: str | Non
     protected_first = repository_name[:protected_split]
     protected_rest = repository_name[protected_split:]
     protected_words = repository_name.split("-")
+    javascript_fragment_source = (
+        "const owner = "
+        + json.dumps(f"https://github.com/{GITHUB_OWNER}/")
+        + ";\nconst repository = ["
+        + ", ".join(json.dumps(word) for word in protected_words)
+        + '].join("-");\n'
+        + 'const candidate = owner + repository + "/tree/secret";'
+    )
+    if not has_noncanonical_narrative_identifier(
+        javascript_fragment_source,
+        narrative_only_root,
+    ):
+        fail(errors, "generic quoted-fragment privacy regression: JavaScript join")
+    javascript_braced_words = [
+        "".join(f"\\u{{{ord(character):x}}}" for character in word)
+        for word in protected_words
+    ]
+    powershell_braced_words = [
+        "".join(f"`u{{{ord(character):x}}}" for character in word)
+        for word in protected_words
+    ]
+    powershell_ordinary_words = list(protected_words)
+    powershell_ordinary_words[0] = (
+        "`" + protected_words[0][0] + "`" + protected_words[0][1:]
+    )
+    for label, words, separator, language in (
+        ("JavaScript braced Unicode", javascript_braced_words, r"\u{2d}", "javascript"),
+        ("PowerShell braced Unicode", powershell_braced_words, "`u{2d}", "powershell"),
+        ("PowerShell ordinary backtick", powershell_ordinary_words, "-", "powershell"),
+    ):
+        escaped_fragment_source = (
+            "const pieces = ["
+            + ", ".join(json.dumps(word) for word in words)
+            + "].join("
+            + json.dumps(separator)
+            + ");"
+        )
+        if not has_noncanonical_narrative_identifier(
+            escaped_fragment_source,
+            narrative_only_root,
+            quoted_language=language,
+        ):
+            fail(errors, f"generic escaped-fragment privacy regression: {label}")
+    powershell_uppercase_words = [
+        "".join(f"`U{{{ord(character):x}}}" for character in word)
+        for word in protected_words
+    ]
+    powershell_uppercase_source = (
+        "$parts = @(("
+        + ", ".join(json.dumps(word) for word in powershell_uppercase_words)
+        + ')); $candidate = $parts -join "`U{2d}"'
+    )
+    if has_noncanonical_narrative_identifier(
+        powershell_uppercase_source,
+        narrative_only_root,
+        quoted_language="powershell",
+    ):
+        fail(errors, "generic escaped-fragment PowerShell uppercase control regression")
+    cross_language_backtick_source = (
+        "const pieces = ["
+        + ", ".join(json.dumps(word) for word in powershell_ordinary_words)
+        + '].join("-");'
+    )
+    for language in ("javascript", None):
+        if has_noncanonical_narrative_identifier(
+            cross_language_backtick_source,
+            narrative_only_root,
+            quoted_language=language,
+        ):
+            fail(errors, "generic escaped-fragment cross-language backtick regression")
+    if has_noncanonical_narrative_identifier(
+        'const words = ["ordinary", "public", "repository"].join("-");',
+        narrative_only_root,
+    ):
+        fail(errors, "generic quoted-fragment ordinary-text regression")
     character_fragment_source = (
         'dash = chr(45)\nparts = ('
         + ", ".join(f'"{word}"' for word in protected_words)
@@ -2807,6 +3027,8 @@ def validate_release_text(
                 privacy_text,
                 narrative_only_root,
                 normalize_serialized=normalize_serialized,
+                scan_quoted_fragments=relative.suffix.lower() != ".py",
+                quoted_language=quoted_fragment_language(relative),
             ):
                 fail(errors, f"release text has a non-canonical narrative-only identifier: {relative}")
         if is_meta_language:
