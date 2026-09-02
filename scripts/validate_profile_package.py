@@ -196,7 +196,14 @@ def validate_markdown_projection(registry: dict, errors: list[str]) -> None:
 
 
 def validate_release_text(registry: dict, errors: list[str]) -> None:
-    text_paths = [path for path in ROOT.rglob("*") if path.is_file() and path.suffix.lower() in {".md", ".json", ".py", ".yaml", ".yml"}]
+    # Generated Pages output is a projection of already-scanned sources.
+    text_paths = [
+        path
+        for path in ROOT.rglob("*")
+        if path.is_file()
+        and path.suffix.lower() in {".md", ".json", ".py", ".yaml", ".yml"}
+        and path.relative_to(ROOT).parts[0] != "site"
+    ]
     forbidden = [re.compile(pattern) for pattern in (r"\b[A-Z]:[\\/]", r"/Users/", r"\\\\Users\\", r"\.agent-governance", r"refs/heads/", r"scratch/[A-Za-z0-9_.-]+", r"(?i:(?:api[_-]?key|secret|token)\s*[:=])")]
     bounded_terms = {"deployed": ("no ", "not ", "unasserted", "does not"), "production": ("no ", "not ", "unasserted", "non-production"), "autonomous": ("no ", "not ", "never", "bounded", "unasserted"), "headless": ("authorized", "unasserted", "private"), "swarm": ("bounded", "never", "no ", "not "), "implemented": ("only if", "source-owned"), "tested": ("source-owned", "not ", "no ")}
     public_surface_paths = [
