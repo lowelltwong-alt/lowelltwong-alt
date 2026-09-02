@@ -1,0 +1,254 @@
+:root {
+  --paper: #f3eee4;
+  --paper-2: #fffaf2;
+  --ink: #1f1a17;
+  --muted: #5d554d;
+  --rule: #d6ccbe;
+  --accent: #7a2e3a;
+  --link: #1f5b55;
+  --link-hover: #7a2e3a;
+  --code: #ece5d8;
+  --thead: #e8dfd1;
+  --banner: #ece3d4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  line-height: 1.65;
+}
+
+a {
+  color: var(--link);
+}
+
+a:hover {
+  color: var(--link-hover);
+}
+
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+}
+
+.skip-link:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 20;
+}
+
+.masthead {
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper-2);
+  border-top: 6px solid var(--accent);
+}
+
+.masthead-inner,
+.wrap,
+.site-footer-inner {
+  width: min(72rem, calc(100% - 2rem));
+  margin: 0 auto;
+}
+
+.masthead-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 1.1rem 0 0.9rem;
+}
+
+.identity {
+  text-decoration: none;
+  color: inherit;
+}
+
+.identity-name {
+  display: block;
+  font-size: 1.35rem;
+  letter-spacing: 0.01em;
+}
+
+.identity-tag {
+  display: block;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 0.92rem;
+}
+
+.nav a[aria-current="page"] {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 650;
+}
+
+.banner {
+  background: var(--banner);
+  border-bottom: 1px solid var(--rule);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.banner p {
+  width: min(72rem, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 0.7rem 0;
+}
+
+main {
+  padding: 1.75rem 0 3rem;
+}
+
+.prose {
+  width: min(48rem, 100%);
+}
+
+.prose--wide {
+  width: min(72rem, 100%);
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+.prose h1 {
+  font-size: 2rem;
+  margin: 0 0 1rem;
+}
+
+.prose h2 {
+  font-size: 1.35rem;
+  margin: 2rem 0 0.7rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--rule);
+}
+
+.prose h3 {
+  font-size: 1.12rem;
+  margin: 1.4rem 0 0.5rem;
+}
+
+.prose p,
+.prose ul,
+.prose ol,
+.prose blockquote,
+.prose pre,
+.prose table {
+  margin: 0 0 1rem;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.3rem;
+}
+
+.prose li + li {
+  margin-top: 0.3rem;
+}
+
+.prose blockquote {
+  margin-left: 0;
+  padding: 0.15rem 0 0.15rem 1rem;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+}
+
+.prose code {
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  background: var(--code);
+  padding: 0.08em 0.32em;
+  border-radius: 3px;
+}
+
+.prose pre {
+  overflow-x: auto;
+  background: #231e1b;
+  color: #f3eee4;
+  padding: 0.9rem 1rem;
+  border-radius: 6px;
+}
+
+.prose pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font-size: 0.84rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin: 0 0 1rem;
+}
+
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.95rem;
+  background: var(--paper-2);
+}
+
+.prose th,
+.prose td {
+  border: 1px solid var(--rule);
+  padding: 0.45rem 0.6rem;
+  vertical-align: top;
+  text-align: left;
+}
+
+.prose th {
+  background: var(--thead);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.site-footer {
+  border-top: 1px solid var(--rule);
+  background: var(--paper-2);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.site-footer-inner {
+  padding: 1.2rem 0 1.6rem;
+}
+
+.site-footer p {
+  margin: 0 0 0.45rem;
+}
+
+.not-found {
+  min-height: 40vh;
+}

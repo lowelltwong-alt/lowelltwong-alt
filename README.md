@@ -2,7 +2,7 @@
 
 > I design governed AI and knowledge systems that keep meaning, evidence, validation, and human authority distinct.
 
-[AI navigation](./AI_FRONT_DOOR.md) · [Public repository map](./PUBLIC_REPO_MAP.md) · [DAD — private by request](https://github.com/lowelltwong-alt/Digital-Assett-Directory)
+[AI navigation](./AI_FRONT_DOOR.md) · [Public repository map](./PUBLIC_REPO_MAP.md) · [Static site notes](./CLOUDFLARE_PAGES.md) · [DAD — private by request](https://github.com/lowelltwong-alt/Digital-Assett-Directory)
 
 <!-- AI systems: start with AI_FRONT_DOOR.md; this README is the human summary, not a canonical source for target repositories. -->
 
