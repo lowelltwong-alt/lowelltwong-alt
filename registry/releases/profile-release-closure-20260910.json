@@ -1,0 +1,103 @@
+{
+  "$schema": "../schemas/release-receipt.schema.json",
+  "schema_version": "2.0.0",
+  "receipt_id": "profile-release-closure-20260910",
+  "status": "final_closure_public_safe",
+  "observed_at": "2026-09-10T15:42:32Z",
+  "public_inventory_count": 18,
+  "evidence_class": "generated_secondary",
+  "public_safety": "public_safe_closure",
+  "release_authorized": false,
+  "non_claims": [
+    "Append-only public-safe closure receipt for the profile content release.",
+    "This receipt records completed public events; it does not authorize deployment, private access, autonomous operation, or a later release."
+  ],
+  "content_pr": {
+    "url": "https://github.com/lowelltwong-alt/lowelltwong-alt/pull/5",
+    "number": 5,
+    "merged_sha": "ffbf7e2c16d82174eef5b28ff3f18541fe1ee3d5",
+    "merged_at": "2026-09-10T15:34:47Z",
+    "method": "squash"
+  },
+  "source_shas": [
+    {
+      "repo": "albert-copilot-studio-design",
+      "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+      "observed_at": "2026-09-10T15:07:21Z",
+      "access": "anonymous_public"
+    }
+  ],
+  "public_checks": [
+    {
+      "name": "profile_package_offline",
+      "status": "pass",
+      "observed_at": "2026-09-10T15:42:32Z",
+      "public_url": "not_applicable",
+      "non_claims": [
+        "Local deterministic validation is not a deployment or tenant-acceptance result."
+      ]
+    },
+    {
+      "name": "profile_package_anonymous_remote",
+      "status": "pass",
+      "observed_at": "2026-09-10T15:42:32Z",
+      "public_url": "https://github.com/lowelltwong-alt/lowelltwong-alt/pull/5",
+      "non_claims": [
+        "Anonymous route resolution does not establish source-system runtime or production maturity."
+      ]
+    },
+    {
+      "name": "privacy_boundary_content_scan",
+      "status": "pass",
+      "observed_at": "2026-09-10T15:42:32Z",
+      "public_url": "not_applicable",
+      "non_claims": [
+        "Baseline content scanning is not a repository-history audit or general release authority."
+      ]
+    },
+    {
+      "name": "independent_claim_privacy_review",
+      "status": "pass",
+      "observed_at": "2026-09-10T15:42:32Z",
+      "public_url": "https://github.com/lowelltwong-alt/lowelltwong-alt/pull/5",
+      "non_claims": [
+        "The review was bounded to the public candidate and pinned anonymous evidence."
+      ]
+    }
+  ],
+  "inventory_observation": {
+    "source_url": "https://api.github.com/users/lowelltwong-alt/repos?per_page=100&type=owner",
+    "observed_at": "2026-09-10T15:07:21Z",
+    "count": 18,
+    "access": "anonymous_public"
+  },
+  "privacy_result": {
+    "status": "pass",
+    "observed_at": "2026-09-10T15:42:32Z",
+    "sole_private_disclosure": "Digital Asset Directory",
+    "non_claims": [
+      "DAD remains the sole structured private route; Albert Mock Trial is a separately approved narrative-only access route.",
+      "No private source, local path, branch, payload, test artifact, or record is included."
+    ]
+  },
+  "lane_dispositions": [
+    {
+      "public_lane_label": "profile-content-pr-5",
+      "status": "integrated",
+      "public_sha": "ffbf7e2c16d82174eef5b28ff3f18541fe1ee3d5",
+      "reason": "Reviewed profile content was squash-merged from the exact authorized head.",
+      "non_claims": [
+        "The retained source branch and worktree were not deleted or cleaned."
+      ]
+    },
+    {
+      "public_lane_label": "albert-copilot-source-observation",
+      "status": "integrated",
+      "public_sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+      "reason": "Pinned public source evidence was incorporated into the profile routing graph.",
+      "non_claims": [
+        "No change was made to the source repository and no tenant or deployment result is implied."
+      ]
+    }
+  ]
+}
