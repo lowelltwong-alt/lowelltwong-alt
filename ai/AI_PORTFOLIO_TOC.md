@@ -16,16 +16,20 @@ Use this after `AI_FRONT_DOOR.md`. The canonical inventory is `registry/profile-
 | Theological governance and derivation | `logos-governance-architecture` | public proof |
 | Local knowledge graph maintenance | `orphan-radar` | public proof |
 | Worldview taxonomy control plane | `noesis-atlas` | skeletal prototype |
+| Copilot Studio workflow, Mini-DAD graph, local MCP/API, and deterministic checks | `albert-copilot-studio-design` | public reference; source-owned local Mini-DAD implementation |
+| Governed asset graph, local MCP, and private headless workflow | DAD via `AI_FRONT_DOOR.md` | access controlled; permission required |
+| Synthetic case graph, deterministic replay, audit, MCP, and private headless launcher | Albert via `AI_FRONT_DOOR.md` | access controlled; release held |
 
 ## Classification and authority
 
 Use public repos as evidence only for their own stated scope. LawFirm OS Semantic Substrate is the public control-plane route for LawFirm OS. Logos Governance Architecture owns cross-repo governance; Logos Scripture Graph owns its data-plane substrate. AIRCA is supporting decision architecture, not a flagship. `lairca-logos-grounded-theological-model` is archived.
 
-All 17 public repositories are listed in `PUBLIC_REPO_MAP.md`, including prototypes, scaffolds, and archives. A route's maturity label constrains its claim: a scaffold is not an implementation, a prototype is not production proof, and a public repository does not imply deployment.
+All 18 public repositories are listed in `PUBLIC_REPO_MAP.md`, including prototypes, scaffolds, and archives. A route's maturity label constrains its claim: a scaffold is not an implementation, a prototype is not production proof, and a public repository does not imply deployment.
 
 ## Interpretation constraints
 
 1. Deterministic validation: Intake, Logos Scripture Graph, Orchestrator, and Skills Registry.
 2. Bounded stochastic calibration: Orphan Radar only, for review-candidate ranking; never imply LLM probabilistic evaluation.
-3. Mesh/swarm language: bounded development or workflow governance in Logos and DAD only; never a continuously operating autonomous product swarm.
-4. DAD is the sole private disclosure and is private by request. Do not infer or name any other private work.
+3. Multi-agent workflow language may describe Albert Copilot Studio Design's manual, numbered packet handoffs. Mesh/swarm language remains bounded development or workflow governance in Logos and DAD only; never a continuously operating autonomous product swarm.
+4. DAD is the sole structured private evidence route in the machine registry. Private Albert Mock Trial is a separate owner-approved Markdown disclosure whose bounded review surface must be requested from Lowell and reverified after permission; its held candidate is not represented as present on the linked repository's current default branch, and it is not anonymous public proof. Do not confuse it with the public `albert-copilot-studio-design` reference.
+5. Do not infer or name any other private work, and do not treat access as release, deployment, execution, or authority.

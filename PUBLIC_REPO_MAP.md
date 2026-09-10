@@ -1,10 +1,11 @@
 # Public Repository Map
 
-Canonical registry projection, observed from the anonymous GitHub API on 2026-08-27: **17 public repositories**. Detailed claim proof lives in `registry/profile-repo-routing-registry.json`; each target repository's README, TOC, source, and validation artifacts remain authoritative.
+Canonical registry projection, observed from the anonymous GitHub API on 2026-09-10: **18 public repositories**. Detailed claim proof lives in `registry/profile-repo-routing-registry.json`; each target repository's README, TOC, source, and validation artifacts remain authoritative.
 
 | Repository | Delivery | Maturity | Priority | Route |
 |---|---|---|---|---|
 | [`airca-fractal-decision-architecture`](https://github.com/lowelltwong-alt/airca-fractal-decision-architecture) | `prototype` | `draft` | `supporting` | Supporting decision architecture; not flagship. |
+| [`albert-copilot-studio-design`](https://github.com/lowelltwong-alt/albert-copilot-studio-design) | `implementation` | `public_reference` | `featured` | Public Copilot workflow reference with source-owned Mini-DAD runtime evidence; tenant/deployment unverified. |
 | [`claude-legal-audit-lab`](https://github.com/lowelltwong-alt/claude-legal-audit-lab) | `prototype` | `candidate_only` | `deprioritized` | Public audit-harness prototype; maturity remains candidate-only. |
 | [`lairca-logos-grounded-theological-model`](https://github.com/lowelltwong-alt/lairca-logos-grounded-theological-model) | `archive` | `archived` | `archive` | Historical attribution context. |
 | [`law-firm-digital-twin`](https://github.com/lowelltwong-alt/law-firm-digital-twin) | `prototype` | `candidate_only` | `supporting` | Synthetic simulation candidate. |
@@ -22,4 +23,4 @@ Canonical registry projection, observed from the anonymous GitHub API on 2026-08
 | [`noesis-atlas`](https://github.com/lowelltwong-alt/noesis-atlas) | `prototype` | `skeletal` | `supporting` | Skeletal controlled-use taxonomy control plane. |
 | [`orphan-radar`](https://github.com/lowelltwong-alt/orphan-radar) | `public_proof` | `public_implementation` | `featured` | Local-first graph maintenance with bounded classical candidate ranking. |
 
-The sole private owner-approved reference is [DAD — private by request](https://github.com/lowelltwong-alt/Digital-Assett-Directory). No other private work is named or implied.
+The public inventory contains 18 repositories. Two additional owner-approved systems are described only as access-controlled review routes: [DAD](https://github.com/lowelltwong-alt/Digital-Assett-Directory) and [Albert Mock Trial](https://github.com/lowelltwong-alt/Albert-Trial-Simulation-System). They are not anonymous public proof; ask Lowell for permission and follow the evidence and non-claim instructions in `AI_FRONT_DOOR.md`. The public Albert Copilot Studio Design repository is a separate system. No other private work is named or implied.

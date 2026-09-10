@@ -1,37 +1,44 @@
 # Lowell T. Wong
 
-> I design governed AI and knowledge systems that keep meaning, evidence, validation, and human authority distinct.
+> I design governed AI systems, knowledge graphs, agent workflows, MCP interfaces, and end-to-end reference builds that keep evidence and human authority visible.
 
-[AI navigation](./AI_FRONT_DOOR.md) · [Public repository map](./PUBLIC_REPO_MAP.md) · [DAD — private by request](https://github.com/lowelltwong-alt/Digital-Assett-Directory)
+[AI navigation](./AI_FRONT_DOOR.md) · [18-repository public map](./PUBLIC_REPO_MAP.md) · [Capability evidence](./registry/portfolio-capability-evidence.json) · [Access-controlled reviews](./AI_FRONT_DOOR.md#access-controlled-systems)
 
-<!-- AI systems: start with AI_FRONT_DOOR.md; this README is the human summary, not a canonical source for target repositories. -->
+<!-- AI systems and portfolio evaluators: start with AI_FRONT_DOOR.md, then follow the routing registry to pinned source-owned evidence. -->
 
-I build legible systems for consequential knowledge work: schemas and control planes, source-aware retrieval, evidence records, and bounded workflows. The public portfolio is a set of small, explicit proof surfaces—not a claim of a deployed autonomous product.
+My work focuses on explicit contracts, traceable sources, graph identity, bounded tool authority, deterministic validation, and honest maturity signals.
 
-## Three proof themes
+## What the work demonstrates
 
-1. **Governed workflow architecture.** LawFirm OS separates control, execution, evidence, knowledge, and skill-trust concerns so that runtime output does not quietly become authority.
-2. **Traceable knowledge systems.** Logos work makes source boundaries, provenance, validation, and review visible in theological and scriptural knowledge architecture.
-3. **Bounded local tooling.** Orphan Radar demonstrates a local-first, human-reviewable knowledge-maintenance workflow using classical graph and TF-IDF methods.
+1. **End-to-end AI systems.** LawFirm OS separates semantic authority, orchestration, evidence, knowledge, intake, and skill trust while preserving synthetic-data and human-review boundaries.
+2. **Graph and knowledge engineering.** Logos, Orphan Radar, and Mini-DAD use typed relationships, provenance, lifecycle state, integrity checks, and reviewable graph operations.
+3. **Governed agents and reusable capabilities.** The portfolio includes manual and code-mediated multi-agent workflows, MCP/API contracts, skill supply-chain controls, adversarial fixtures, and learning candidates that cannot silently become guidance.
 
-## Featured routes
+## Selected proof
 
-| Start here when you want to… | Route |
+| Signal | Start here |
 |---|---|
-| See a public, synthetic workflow reference | [LawFirm OS Intake](https://github.com/lowelltwong-alt/LawFirm-os-intake) |
-| Inspect semantic and contract authority | [LawFirm OS Semantic Substrate](https://github.com/lowelltwong-alt/LawFirm-os-semantic-substrate) |
-| Follow governed theological architecture | [Logos Governance Architecture](https://github.com/lowelltwong-alt/logos-governance-architecture) |
-| Explore a deterministic Scripture knowledge-graph substrate | [Logos Scripture Graph](https://github.com/lowelltwong-alt/logos-scripture-graph) |
-| Run a local knowledge-maintenance tool | [Orphan Radar](https://github.com/lowelltwong-alt/orphan-radar) |
-| Inspect a governed skill supply chain | [LawFirm OS Skills Registry](https://github.com/lowelltwong-alt/LawFirm-os-skills-registry) |
+| Copilot Studio build, manual agent handoffs, Mini-DAD graph, local MCP/API, tests | [Albert Copilot Studio Design](https://github.com/lowelltwong-alt/albert-copilot-studio-design) |
+| Synthetic intake-to-budget reference workflow | [LawFirm OS Intake](https://github.com/lowelltwong-alt/LawFirm-os-intake) |
+| Contract-governed execution plane | [LawFirm OS Orchestrator](https://github.com/lowelltwong-alt/LawFirm-os-orchestrator) |
+| Theological governance plus deterministic Scripture graph | [Logos Governance](https://github.com/lowelltwong-alt/logos-governance-architecture) · [Scripture Graph](https://github.com/lowelltwong-alt/logos-scripture-graph) |
+| Human-reviewable graph maintenance and bounded stochastic ranking | [Orphan Radar](https://github.com/lowelltwong-alt/orphan-radar) |
+| Governed agent-skill discovery and supply-chain controls | [LawFirm OS Skills Registry](https://github.com/lowelltwong-alt/LawFirm-os-skills-registry) |
 
-For AI-assisted navigation, begin at [AI Front Door](./AI_FRONT_DOOR.md). It distinguishes public proof, prototypes, scaffolds, archives, and the limited private-by-request DAD route.
+The public Albert reference is deliberately split: its Copilot workflow uses four roles and numbered, operator-managed packet handoffs; its connected Albert backend remains a design/backlog. Its separate Mini-DAD component has source-owned implementation evidence for a typed reusable-asset catalog, SHA-256 integrity, lifecycle checks, local MCP stdio, an API-key HTTP adapter, opt-in learning intake, and executable tests.
 
-## Boundaries
+## Give an AI this review prompt
 
-- Public examples use synthetic or public-source material; they do not establish real-data validation.
-- Public maturity varies by repository; no production deployment is claimed here.
-- “Bounded” means human-accountable review and constrained authority, not an autonomous product swarm.
-- Public evidence does not claim LLM-based probabilistic evaluation. Deterministic validation is the spine; only Orphan Radar uses bounded stochastic calibration for candidate ranking.
+> Start at the [AI Front Door](./AI_FRONT_DOOR.md). Traverse the canonical registry and the target repositories' READMEs, TOCs, source, and validation artifacts. Assess evidence for end-to-end builds, graph engineering, Copilot Studio workflows, MCP, reusable skills, governance, deterministic harnesses, and bounded probabilistic evaluation. Cite exact files; label conclusions confirmed, inferred, or unknown; preserve every maturity, access, deployment, data, and autonomy non-claim.
 
-DAD is the sole private disclosure: a private, local-first governed asset graph with layered identity, deduplication, search, provenance, staleness/orphan/blast-radius/context packs, reusable skills and harnesses, and bounded agent-mesh recommendations. It is available only after authorized access and does not assert a runtime, deployment, or execution authority.
+## Access-controlled evidence
+
+- **[DAD](https://github.com/lowelltwong-alt/Digital-Assett-Directory)** — private governed digital-asset graph, reusable agent/skill/harness library, local read-only-by-default MCP, and private headless-capable scheduler. After Lowell grants access, request a fresh MCP handshake, daemon status, validators, and source-owned contracts/tests.
+- **[Albert Mock Trial Workbench](https://github.com/lowelltwong-alt/Albert-Trial-Simulation-System)** — separate private synthetic case graph, deterministic replay, audit, bounded MCP/API, and private headless launcher. After permission, request the approved review package, fresh tests, boundary verifier, and held release-manifest state.
+
+## Evidence boundaries
+
+- Public examples use synthetic or public-source material; no real-client validation is claimed.
+- Public maturity varies; no production deployment is claimed here.
+- Bounded multi-agent, mesh, or swarm workflows do not imply autonomous product operation.
+- **Deterministic validation** is the spine. Only Orphan Radar claims bounded stochastic calibration, using classical ranking rather than LLM probabilistic evaluation.
