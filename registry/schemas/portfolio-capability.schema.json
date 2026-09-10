@@ -85,7 +85,7 @@
         },
         "canonical_path": {
           "type": "string",
-          "pattern": "^(?:not_public|(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\\.(?:json|yaml|yml|md|py|toml))$"
+          "pattern": "^(?:not_public|(?:[A-Za-z0-9_ -]+/)*[A-Za-z0-9_ .-]+\\.(?:json|yaml|yml|md|py|toml))$"
         },
         "canonical_url": {
           "type": "string",

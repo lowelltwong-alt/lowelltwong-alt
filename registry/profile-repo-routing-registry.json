@@ -2,9 +2,9 @@
   "$schema": "schemas/profile-routing.schema.json",
   "schema_version": "2.0.0",
   "registry_id": "lowelltwong-alt.profile-routing.v2",
-  "observed_at": "2026-08-31T18:55:09Z",
+  "observed_at": "2026-09-10T15:07:21Z",
   "inventory_source": "https://api.github.com/users/lowelltwong-alt/repos?per_page=100&type=owner",
-  "public_inventory_count": 17,
+  "public_inventory_count": 18,
   "controlled_aliases": [
     "graph_engineering",
     "knowledge_graphs",
@@ -64,6 +64,183 @@
       "access": "anonymous_public",
       "non_claims": [
         "Not flagship."
+      ],
+      "pin_policy": "exact_default_head"
+    },
+    {
+      "name": "albert-copilot-studio-design",
+      "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design",
+      "visibility": "public",
+      "delivery": "implementation",
+      "maturity": "public_reference",
+      "validation_state": "partially_asserted",
+      "priority": {
+        "value": "featured",
+        "reason": "Public Copilot Studio workflow reference with source-owned Mini-DAD runtime and MCP/API evidence."
+      },
+      "capability_tags": [
+        "ai_governance",
+        "copilot_studio_build",
+        "deterministic_harnesses",
+        "end_to_end_build",
+        "graph_engineering",
+        "mcp_server",
+        "multi_agent_workflows",
+        "skill_supply_chain"
+      ],
+      "claim_ids": [
+        "repo.albert_copilot.scope"
+      ],
+      "pinned_public_sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+      "observed_at": "2026-09-10T15:07:21Z",
+      "evidence_routes": [
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "AI_FRONT_DOOR.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/AI_FRONT_DOOR.md",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "The connected Albert package is incomplete; Mini-DAD is a separate local implementation."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "AI-TOC.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/AI-TOC.md",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Navigation evidence only; follow the target files before evaluating implementation."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Albert Prompt Only Version/README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Albert%20Prompt%20Only%20Version/README.md",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Prompt-only, operator-mediated workflow; no tenant acceptance or automatic handoff is claimed."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Albert MCP and API Version/More/SERVER-STATUS.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Albert%20MCP%20and%20API%20Version/More/SERVER-STATUS.md",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "The full Albert case backend is not implemented by this package."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Extras/Mini DAD/AI_FRONT_DOOR.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Extras/Mini%20DAD/AI_FRONT_DOOR.md",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Local implementation evidence; no Azure deployment, tenant acceptance, or automatic lesson promotion is claimed."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Extras/Mini DAD/runtime.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Extras/Mini%20DAD/runtime.py",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Local runtime source; no public service or production deployment is claimed."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Extras/Mini DAD/mcp_stdio.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Extras/Mini%20DAD/mcp_stdio.py",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Local MCP stdio source; no remote public MCP service is claimed."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Extras/Mini DAD/network_adapter.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Extras/Mini%20DAD/network_adapter.py",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "API-key adapter source; Entra or OAuth validation is not claimed."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Extras/Mini DAD/tests/test_runtime.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Extras/Mini%20DAD/tests/test_runtime.py",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Executable local checks do not establish tenant compatibility or production acceptance."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Extras/Mini DAD/tests/test_network.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Extras/Mini%20DAD/tests/test_network.py",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Executable network-adapter checks do not establish Azure deployment or tenant acceptance."
+          ],
+          "repository": "albert-copilot-studio-design"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Prompt-only Albert workflow uses manual packet handoffs and operator-managed storage.",
+        "Full Albert case backend is not implemented by this package.",
+        "Azure deployment, Copilot tenant acceptance, production use, and semantic quality remain unverified.",
+        "Mini-DAD learning intake is opt-in and human-reviewed; it does not automatically promote guidance."
       ],
       "pin_policy": "exact_default_head"
     },
@@ -1712,6 +1889,134 @@
       "access": "anonymous_public",
       "non_claims": [
         "Classical bounded ranking only."
+      ]
+    },
+    {
+      "id": "repo.albert_copilot.scope",
+      "statement": "Public reference package combining a prompt-only, operator-mediated Microsoft Copilot Studio workflow with source-owned Mini-DAD implementation evidence for a reusable-asset catalog, typed graph, local MCP stdio server, API-key HTTP adapter, and deterministic local tests.",
+      "source_repositories": [
+        "albert-copilot-studio-design"
+      ],
+      "evidence_routes": [
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "AI_FRONT_DOOR.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/AI_FRONT_DOOR.md",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "The connected Albert package is incomplete; Mini-DAD is a separate local implementation."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Albert Prompt Only Version/README.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Albert%20Prompt%20Only%20Version/README.md",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Prompt-only, operator-mediated workflow; no tenant acceptance or automatic handoff is claimed."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Albert MCP and API Version/More/SERVER-STATUS.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Albert%20MCP%20and%20API%20Version/More/SERVER-STATUS.md",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "The full Albert case backend is not implemented by this package."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Extras/Mini DAD/AI_FRONT_DOOR.md",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Extras/Mini%20DAD/AI_FRONT_DOOR.md",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Local implementation evidence; no Azure deployment, tenant acceptance, or automatic lesson promotion is claimed."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Extras/Mini DAD/mcp_stdio.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Extras/Mini%20DAD/mcp_stdio.py",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Local MCP stdio source; no remote public MCP service is claimed."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Extras/Mini DAD/network_adapter.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Extras/Mini%20DAD/network_adapter.py",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "API-key adapter source; Entra or OAuth validation is not claimed."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Extras/Mini DAD/tests/test_runtime.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Extras/Mini%20DAD/tests/test_runtime.py",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Executable local checks do not establish tenant compatibility or production acceptance."
+          ],
+          "repository": "albert-copilot-studio-design"
+        },
+        {
+          "sha": "0c78ce325f8f71a0dd8dd3ae4a22fa44be681576",
+          "canonical_path": "Extras/Mini DAD/tests/test_network.py",
+          "canonical_url": "https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/Extras/Mini%20DAD/tests/test_network.py",
+          "observation_time": "2026-09-10T15:07:21Z",
+          "evidence_class": "source_owned_public",
+          "access_level": "anonymous_public",
+          "source_owned": true,
+          "generated": false,
+          "non_claims": [
+            "Executable network-adapter checks do not establish Azure deployment or tenant acceptance."
+          ],
+          "repository": "albert-copilot-studio-design"
+        }
+      ],
+      "access": "anonymous_public",
+      "non_claims": [
+        "Prompt-only Albert workflow uses manual packet handoffs and operator-managed storage.",
+        "Full Albert case backend is not implemented by this package.",
+        "Azure deployment, Copilot tenant acceptance, production use, and semantic quality remain unverified.",
+        "Mini-DAD learning intake is opt-in and human-reviewed; it does not automatically promote guidance."
       ]
     },
     {

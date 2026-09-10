@@ -13,6 +13,7 @@ The profile is a router, not canonical authority for target-repository internals
 | Capability boundaries and non-claims | `registry/portfolio-capability-evidence.json` |
 | Architecture grammar | `ai/BUILD_PHILOSOPHY.md` |
 | Maintenance and release discipline | `ai/AI_UPDATE_INSTRUCTIONS.md` |
+| Public Copilot Studio workflow, Mini-DAD graph, MCP, API, and tests | [Albert Copilot Studio Design](https://github.com/lowelltwong-alt/albert-copilot-studio-design) |
 | Governed asset graph, local MCP, and private headless evidence | [DAD — access required](https://github.com/lowelltwong-alt/Digital-Assett-Directory) |
 | Synthetic case graph, replay, audit, MCP, and private headless evidence | [Albert Mock Trial — access required](https://github.com/lowelltwong-alt/Albert-Trial-Simulation-System) |
 
@@ -23,9 +24,24 @@ The profile is a router, not canonical authority for target-repository internals
 - “Swarm” or “mesh” describes bounded development and workflow governance in Logos and DAD. It does not describe a continuously operating autonomous product swarm.
 - No public repo is evidence of production deployment, real client-data validation, autonomous execution authority, or mature end-to-end LLM evaluation.
 
+## Public Copilot Studio and Mini-DAD reference
+
+[Albert Copilot Studio Design](https://github.com/lowelltwong-alt/albert-copilot-studio-design) is public source-owned evidence for two deliberately separated surfaces: an operator-mediated, prompt-only Microsoft Copilot Studio witness-preparation workflow, and a standalone Mini-DAD implementation for discovering reusable agents, workflows, skills, prompts, harnesses, and lifecycle protocols.
+
+Read its [AI Front Door](https://github.com/lowelltwong-alt/albert-copilot-studio-design/blob/0c78ce325f8f71a0dd8dd3ae4a22fa44be681576/AI_FRONT_DOOR.md), then `AI-TOC.md` and the selected package routes. For a capability assessment, inspect:
+
+1. `Albert Prompt Only Version/README.md`, `Albert Prompt Only Version/PROMPTS/00-PLACEMENT.md`, `Albert Prompt Only Version/WORKFLOWS/README.md`, and `Albert Prompt Only Version/More/MVP-Reference/03-GRAPH-AND-STATE.md` — four-role Copilot build instructions, numbered manual packet handoffs, graph/state identity, review, and stop rules.
+2. `Albert MCP and API Version/More/SERVER-STATUS.md` and `Albert MCP and API Version/More/Reference/03-MCP-AND-API.md` — connected contracts, schemas, connector design, and the explicit incomplete-backend boundary.
+3. `Extras/Mini DAD/AI_FRONT_DOOR.md`, `Extras/Mini DAD/RUNTIME-CONTRACT.md`, `Extras/Mini DAD/DATA-MODEL.md`, and `Extras/Mini DAD/catalog.json` — typed asset graph, SHA-256 integrity, provenance, lifecycle/expiry, and opt-in learning-candidate controls.
+4. `Extras/Mini DAD/runtime.py`, `Extras/Mini DAD/mcp_stdio.py`, `Extras/Mini DAD/network_adapter.py`, `Extras/Mini DAD/tests/test_runtime.py`, and `Extras/Mini DAD/tests/test_network.py` — local implementation, fail-closed MCP initialize/list/call behavior, guarded HTTP parity, and executable checks.
+5. `Extras/Mini DAD/azure/README.md` — deployment recipe and the acceptance work that remains pending.
+6. `Albert MCP and API Version/More/Reference/design-validation-report.json` and `Albert MCP and API Version/More/Reference/reference-test-report.json` — generated secondary receipts for selected checks; read their exclusions and do not substitute them for source or tenant validation.
+
+Treat the repository as a public design/reference build with source-owned implementation evidence for its local Mini-DAD component. The prompt-only flow uses manual handoffs and operator-managed storage; the package explicitly states that it does not implement the full Albert case backend. Azure deployment, Copilot tenant acceptance, Entra/OAuth validation, production use, real-case/provider/model evaluation, semantic quality, and automatic lesson promotion are unverified or explicitly unclaimed. Mini-DAD is publicly inspectable but separately licensed; inspection is not permission to deploy or reuse it.
+
 ## Access-controlled systems
 
-These systems are not part of the 17-repository public inventory, and their GitHub links may return `404` without authorized account access. The descriptions below are owner-approved public summaries, not anonymous source proof. Ask Lowell for permission before inspection; access to one system does not grant access to the other or to any deeper private core.
+These systems are not part of the 18-repository public inventory, and their GitHub links may return `404` without authorized account access. The descriptions below are owner-approved public summaries, not anonymous source proof. Ask Lowell for permission before inspection; access to one system does not grant access to the other or to any deeper private core. The public Albert Copilot Studio Design repository above is distinct from the private Albert Mock Trial Workbench route below.
 
 ### Digital Asset Directory (DAD)
 
@@ -59,6 +75,6 @@ Do not infer or request any other private repository, local path, branch, source
 
 ## Claim discipline
 
-Treat a public capability as implemented only if its `claim_id` resolves to pinned, source-owned public evidence in the routing registry. Treat DAD and Albert as access-controlled review routes until permission is granted and their source-owned private evidence is reverified. Generated profile reports are secondary evidence. Preserve the registry labels: `public_proof`, `private_on_request`, `implementation`, `prototype`, `scaffold`, `planned`, and `archive`.
+Treat a public capability as implemented only if its `claim_id` resolves to pinned, source-owned public evidence in the routing registry. Treat private DAD and Albert Mock Trial as access-controlled review routes until permission is granted and their source-owned private evidence is reverified. Generated profile reports are secondary evidence. Preserve the registry labels: `public_proof`, `private_on_request`, `implementation`, `prototype`, `scaffold`, `planned`, and `archive`.
 
 For an AI-safe summary, say what the named source supports; label gaps as unknown. Do not invent repository names, schemas, endpoints, test results, release maturity, access paths, or deployment claims.

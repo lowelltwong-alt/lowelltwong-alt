@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from html import unescape
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import SplitResult, unquote, urlsplit
+from urllib.parse import SplitResult, quote, unquote, urlsplit
 from urllib.request import Request, urlopen
 
 try:
@@ -35,7 +35,7 @@ except ImportError as error:  # pragma: no cover - explicit operator failure
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = ROOT / "registry" / "profile-repo-routing-registry.json"
 CAPABILITIES_PATH = ROOT / "registry" / "portfolio-capability-evidence.json"
-RECEIPT_PATH = ROOT / "registry" / "releases" / "content-candidate-public-safe.json"
+RECEIPT_PATH = ROOT / "registry" / "releases" / "content-candidate-public-safe-20260910.json"
 RELEASES_DIR = ROOT / "registry" / "releases"
 PORTABLE_PATH = ROOT / "registry" / "portable-workflow-patterns.json"
 PORTABLE_SCHEMA_PATH = ROOT / "registry" / "schemas" / "portable-workflow-patterns.schema.json"
@@ -5131,13 +5131,17 @@ def validate_cross_references(registry: dict, capabilities: dict, receipt: dict,
         fail_if(receipt["public_inventory_count"] != len(repos), "candidate receipt inventory count does not match registry cardinality")
         fail_if(receipt["release_authorized"] is not False, "candidate receipt must remain non-authorizing")
     for release in receipts:
-        fail_if(release.get("public_inventory_count") != len(repos), "release receipt inventory count does not match registry cardinality")
         fail_if(release.get("release_authorized") is not False, "release receipt must remain non-authorizing")
         if release.get("status") == "final_closure_public_safe":
             required_final_fields = {
                 "content_pr", "source_shas", "public_checks", "inventory_observation", "privacy_result", "lane_dispositions",
             }
             fail_if(not required_final_fields.issubset(release), "final closure receipt lacks required public-safe closure fields")
+            if "inventory_observation" in release:
+                fail_if(
+                    release.get("public_inventory_count") != release["inventory_observation"].get("count"),
+                    "final closure receipt inventory count does not match its immutable observation",
+                )
 
     repo_by_name = {repo["name"]: repo for repo in repos}
     owned_routes = {}
@@ -5147,7 +5151,8 @@ def validate_cross_references(registry: dict, capabilities: dict, receipt: dict,
         for route in repo["evidence_routes"]:
             fail_if(route["repository"] != repo["name"], f"{repo['name']}: evidence repository owner mismatch")
             owned_routes[route_key(route)] = route
-            expected_url = f"{expected_root}/blob/{repo['pinned_public_sha']}/{route['canonical_path']}"
+            encoded_path = quote(route["canonical_path"], safe="/")
+            expected_url = f"{expected_root}/blob/{repo['pinned_public_sha']}/{encoded_path}"
             fail_if(route["sha"] != repo["pinned_public_sha"], f"{repo['name']}: evidence SHA differs from pinned public SHA")
             fail_if(route["canonical_url"] != expected_url, f"{repo['name']}: evidence URL/path/SHA mismatch")
             fail_if(route["evidence_class"] != "source_owned_public" or not route["source_owned"] or route["generated"], f"{repo['name']}: public evidence must be source-owned and non-generated")
